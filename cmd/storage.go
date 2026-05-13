@@ -10,7 +10,7 @@ import (
 var storageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "management storage",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("need valid command")
 	},
 }
@@ -19,7 +19,7 @@ var storageList = &cobra.Command{
 	Use:   "list",
 	Short: "listing all storage",
 	Args:  cobra.RangeArgs(0, 0),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		storageList, err := hyperv.GetStorageList()
 		if err != nil {
 			return err

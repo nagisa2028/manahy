@@ -1,9 +1,8 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import "os/exec"
 
-// GetStorageList get a list of physical storage
+// GetStorageList returns a list of physical storage devices.
 func GetStorageList() (StorageList, error) {
 	res, err := exec.Command("powershell", "-NoProfile", "Get-Disk | Format-Table Number,FriendlyName,Size").Output()
 	if err != nil {

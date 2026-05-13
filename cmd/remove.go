@@ -10,7 +10,7 @@ import (
 var remove = &cobra.Command{
 	Use:   "remove",
 	Short: "remove vm, disk and switch from manahy.yaml",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		data, err := hyperv.UnmarshalYaml("manahy.yaml")
 		if err != nil {
 			fmt.Printf("%s\n", err)

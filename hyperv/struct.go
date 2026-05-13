@@ -1,12 +1,12 @@
-// hyperv package is manage Hyper-V
+// Package hyperv manages Hyper-V via PowerShell commands.
 package hyperv
 
-// Vm is create vm option
-type Vm struct {
+// VM is create vm option.
+type VM struct {
 	Name       string   `yaml:"name" json:"name"`
 	Count      int      `yaml:"count,omitempty"`
 	Generation int      `yaml:"generation" json:"generation"`
-	Cpu        Cpu      `yaml:"cpu" json:"cpu"`
+	CPU        CPU      `yaml:"cpu" json:"cpu"`
 	Memory     Memory   `yaml:"memory" json:"memory"`
 	Path       string   `yaml:"path" json:"path"`
 	Image      string   `yaml:"image,omitempty" json:"image"`
@@ -14,19 +14,19 @@ type Vm struct {
 	Networks   []string `yaml:"network"`
 }
 
-// Cpu is set-processor option
-type Cpu struct {
+// CPU is set-processor option.
+type CPU struct {
 	Thread int  `yaml:"thread"`
 	Nested bool `yaml:"nested"`
 }
 
-// Memory is set memory option
+// Memory is set memory option.
 type Memory struct {
 	Size    string `yaml:"size"`
 	Dynamic bool   `yaml:"dynamic"`
 }
 
-// Disk is create disk option
+// Disk is create disk option.
 type Disk struct {
 	Path       string `yaml:"path"`
 	Size       string `yaml:"size,omitempty"`
@@ -36,7 +36,7 @@ type Disk struct {
 	Import     bool   `yaml:"import,omitempty"`
 }
 
-// VMSwitch is create switch option
+// VMSwitch is create switch option.
 type VMSwitch struct {
 	Name              string `yaml:"name"`
 	Type              string `yaml:"type"`
@@ -44,22 +44,22 @@ type VMSwitch struct {
 	AllowManagementOs bool   `yaml:"allow-management-os,omitempty"`
 }
 
-// SwitchList is all type switch list
+// SwitchList is all type switch list.
 type SwitchList struct {
 	External []string
 	Internal []string
 	Private  []string
 }
 
-// VmList is all status vm list
-type VmList struct {
+// VMList is all status vm list.
+type VMList struct {
 	Running []string
 	Saved   []string
 	Paused  []string
 	Off     []string
 }
 
-// StorageList is physical storage list
+// StorageList is physical storage list.
 type StorageList struct {
 	Number       []string
 	FriendlyName []string
@@ -67,9 +67,9 @@ type StorageList struct {
 	SizeUnit     []string
 }
 
-// Summarize is top-level structure for manahy.yaml
+// Summarize is top-level structure for manahy.yaml.
 type Summarize struct {
-	Vms      map[string]Vm       `yaml:"vms"`
+	Vms      map[string]VM       `yaml:"vms"`
 	Disks    map[string]Disk     `yaml:"disks"`
 	Networks map[string]VMSwitch `yaml:"networks"`
 }

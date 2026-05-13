@@ -11,8 +11,8 @@ var vmListOption struct {
 	paused   bool
 	all      bool
 }
-var newVmName string
-var vm hyperv.Vm
+var newVMName string
+var vm hyperv.VM
 var vmDisk string
 var vmSwitch string
 

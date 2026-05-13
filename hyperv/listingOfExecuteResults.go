@@ -1,4 +1,3 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import (
@@ -11,99 +10,101 @@ import (
 var newLine = "\r\n|\n"
 var spaceChar = "^[-\\s]*$"
 
-func listingOfExecuteResults(res []byte, flag string) (list []string) {
+func listingOfExecuteResults(res []byte, flag string) []string {
+	var list []string
 	split := regexp.MustCompile(newLine).Split(string(res), -1)
-	for i := range split {
-		split[i] = strings.Trim(split[i], " ")
-		if split[i] != flag && !regexp.MustCompile("^-*$").Match([]byte(split[i])) && split[i] != "" {
-			list = append(list, split[i])
+	for _, line := range split {
+		line = strings.Trim(line, " ")
+		if line != flag && !regexp.MustCompile("^-*$").MatchString(line) && line != "" {
+			list = append(list, line)
 		}
 	}
-	return
+	return list
 }
 
-func vmListingOfExecuteResults(res []byte) (vmList VmList, err error) {
+func vmListingOfExecuteResults(res []byte) (VMList, error) {
+	var vmList VMList
 	split := regexp.MustCompile(newLine).Split(string(res), -1)
-	for i := range split {
-		split[i] = strings.TrimSpace(split[i])
-		if !strings.Contains(split[i], "Name") && !regexp.MustCompile(spaceChar).Match([]byte(split[i])) {
-			state := regexp.MustCompile("Running$|Saved$|Off$|Paused$").FindString(split[i])
-			split[i] = regexp.MustCompile("Running$|Saved$|Off$|Paused$").ReplaceAllString(split[i], "")
-			split[i] = strings.TrimSpace(split[i])
+	for _, line := range split {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Name") || regexp.MustCompile(spaceChar).MatchString(line) {
+			continue
+		}
+		state := regexp.MustCompile("Running$|Saved$|Off$|Paused$").FindString(line)
+		line = strings.TrimSpace(regexp.MustCompile("Running$|Saved$|Off$|Paused$").ReplaceAllString(line, ""))
 
-			switch state {
-			case "Running":
-				vmList.Running = append(vmList.Running, split[i])
-			case "Saved":
-				vmList.Saved = append(vmList.Saved, split[i])
-			case "Off":
-				vmList.Off = append(vmList.Off, split[i])
-			case "Paused":
-				vmList.Paused = append(vmList.Paused, split[i])
-			default:
-				return vmList, fmt.Errorf("unknown status for listing vm's")
-			}
+		switch state {
+		case "Running":
+			vmList.Running = append(vmList.Running, line)
+		case "Saved":
+			vmList.Saved = append(vmList.Saved, line)
+		case "Off":
+			vmList.Off = append(vmList.Off, line)
+		case "Paused":
+			vmList.Paused = append(vmList.Paused, line)
+		default:
+			return vmList, fmt.Errorf("unknown VM state in output: %q", state)
 		}
 	}
 	return vmList, nil
 }
 
-func switchListingOfExecuteResults(res []byte) (switchList SwitchList, err error) {
+func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
+	var switchList SwitchList
 	split := regexp.MustCompile(newLine).Split(string(res), -1)
-	for i := range split {
-		split[i] = strings.TrimSpace(split[i])
-		if !strings.Contains(split[i], "Name") && !regexp.MustCompile(spaceChar).Match([]byte(split[i])) {
-			switchType := regexp.MustCompile("External$|Internal$|Private$").FindString(split[i])
-			split[i] = regexp.MustCompile("External$|Internal$|Private$").ReplaceAllString(split[i], "")
-			split[i] = strings.TrimSpace(split[i])
+	for _, line := range split {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Name") || regexp.MustCompile(spaceChar).MatchString(line) {
+			continue
+		}
+		switchType := regexp.MustCompile("External$|Internal$|Private$").FindString(line)
+		line = strings.TrimSpace(regexp.MustCompile("External$|Internal$|Private$").ReplaceAllString(line, ""))
 
-			switch switchType {
-			case "External":
-				switchList.External = append(switchList.External, split[i])
-			case "Internal":
-				switchList.Internal = append(switchList.Internal, split[i])
-			case "Private":
-				switchList.Private = append(switchList.Private, split[i])
-			default:
-				return switchList, fmt.Errorf("unknown error for listing switch's")
-			}
+		switch switchType {
+		case "External":
+			switchList.External = append(switchList.External, line)
+		case "Internal":
+			switchList.Internal = append(switchList.Internal, line)
+		case "Private":
+			switchList.Private = append(switchList.Private, line)
+		default:
+			return switchList, fmt.Errorf("unknown switch type in output: %q", switchType)
 		}
 	}
 	return switchList, nil
 }
 
-func storageListingOfExecuteResults(res []byte) (storageList StorageList, err error) {
+func storageListingOfExecuteResults(res []byte) (StorageList, error) {
+	var storageList StorageList
 	split := regexp.MustCompile(newLine).Split(string(res), -1)
-	for i := range split {
-		split[i] = strings.TrimSpace(split[i])
-		if !strings.Contains(split[i], "Number") && !regexp.MustCompile(spaceChar).Match([]byte(split[i])) {
-			storageList.Number = append(storageList.Number, regexp.MustCompile("^[0-9]+").FindString(split[i]))
-			split[i] = regexp.MustCompile("^[0-9]+").ReplaceAllString(split[i], "")
-
-			storageSize, storageSizeUnit, err := computeCapacity(regexp.MustCompile("[0-9]+$").FindString(split[i]))
-			if err != nil {
-				return storageList, err
-			}
-			storageList.Size = append(storageList.Size, storageSize)
-			storageList.SizeUnit = append(storageList.SizeUnit, storageSizeUnit)
-			split[i] = regexp.MustCompile("[0-9]+$").ReplaceAllString(split[i], "")
-
-			split[i] = strings.TrimSpace(split[i])
-			storageList.FriendlyName = append(storageList.FriendlyName, split[i])
+	for _, line := range split {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Number") || regexp.MustCompile(spaceChar).MatchString(line) {
+			continue
 		}
+		storageList.Number = append(storageList.Number, regexp.MustCompile("^[0-9]+").FindString(line))
+		line = regexp.MustCompile("^[0-9]+").ReplaceAllString(line, "")
+
+		capacity, unit, err := computeCapacity(regexp.MustCompile("[0-9]+$").FindString(line))
+		if err != nil {
+			return storageList, err
+		}
+		storageList.Size = append(storageList.Size, capacity)
+		storageList.SizeUnit = append(storageList.SizeUnit, unit)
+		line = strings.TrimSpace(regexp.MustCompile("[0-9]+$").ReplaceAllString(line, ""))
+		storageList.FriendlyName = append(storageList.FriendlyName, line)
 	}
 	return storageList, nil
 }
 
-func computeCapacity(raw string) (processing float64, unit string, err error) {
-	var parseErr error
-	processing, parseErr = strconv.ParseFloat(raw, 64)
-	if parseErr != nil {
-		return 0, "", fmt.Errorf("error: in type conversion")
+func computeCapacity(raw string) (float64, string, error) {
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse capacity value: %s", raw)
 	}
-	unit = "B"
-	for processing >= 1024 {
-		processing = processing / 1024
+	unit := "B"
+	for v >= 1024 {
+		v /= 1024
 		switch unit {
 		case "B":
 			unit = "KB"
@@ -116,8 +117,8 @@ func computeCapacity(raw string) (processing float64, unit string, err error) {
 		case "TB":
 			unit = "PB"
 		default:
-			return 0, "", fmt.Errorf("error: %s is undefined", unit)
+			return 0, "", fmt.Errorf("undefined capacity unit: %s", unit)
 		}
 	}
-	return
+	return v, unit, nil
 }

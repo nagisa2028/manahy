@@ -40,12 +40,12 @@ func init() {
 	vmList.Flags().BoolVarP(&vmListOption.paused, "paused", "p", false, "list paused vm's")
 	vmList.Flags().BoolVarP(&vmListOption.all, "all", "a", false, "list all vm's")
 
-	vmRename.Flags().StringVarP(&newVmName, "new-name", "n", "", "new vm name")
+	vmRename.Flags().StringVarP(&newVMName, "new-name", "n", "", "new vm name")
 
 	vmCreate.Flags().StringVarP(&vm.Name, "name", "n", "", "new vm name")
 	vmCreate.Flags().IntVarP(&vm.Generation, "generation", "g", 1, "set vm generation")
-	vmCreate.Flags().IntVarP(&vm.Cpu.Thread, "vcpus", "v", 1, "set vm vcpus")
-	vmCreate.Flags().BoolVarP(&vm.Cpu.Nested, "nested", "", false, "enable nested virtualization")
+	vmCreate.Flags().IntVarP(&vm.CPU.Thread, "vcpus", "v", 1, "set vm vcpus")
+	vmCreate.Flags().BoolVarP(&vm.CPU.Nested, "nested", "", false, "enable nested virtualization")
 	vmCreate.Flags().StringVarP(&vm.Memory.Size, "memory", "m", "", "set vm memory")
 	vmCreate.Flags().BoolVarP(&vm.Memory.Dynamic, "nodynamic", "", false, "disable dynamic memory")
 	vmCreate.Flags().StringVarP(&vm.Path, "path", "p", "", "new vm path")

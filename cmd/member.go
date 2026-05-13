@@ -10,7 +10,7 @@ import (
 var memberCmd = &cobra.Command{
 	Use:   "member",
 	Short: "management Hyper-V Administrators group members",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("need valid command")
 	},
 }
@@ -18,7 +18,7 @@ var memberCmd = &cobra.Command{
 var memberListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "show Hyper-V Administrators group members",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		members, err := hyperv.GetGroupMember()
 		if err != nil {
 			return err
@@ -37,7 +37,7 @@ var memberAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "add a user to Hyper-V Administrators",
 	Args:  cobra.RangeArgs(1, 100),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		for _, name := range args {
 			if err := hyperv.AddGroupMember(name); err != nil {
 				return err
@@ -51,7 +51,7 @@ var memberRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "remove a user from Hyper-V Administrators",
 	Args:  cobra.RangeArgs(1, 100),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		for _, name := range args {
 			if err := hyperv.RemoveGroupMember(name); err != nil {
 				return err

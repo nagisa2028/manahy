@@ -1,21 +1,18 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import "strconv"
 
-// BuildByStruct creates VMs, disks, and switches from a Summarize config
+// BuildByStruct creates VMs, disks, and switches from a Summarize config.
 func BuildByStruct(summarize Summarize) error {
 	for _, disk := range summarize.Disks {
-		err := CreateDisk(disk, true)
-		if err != nil {
+		if err := CreateDisk(disk, true); err != nil {
 			return err
 		}
 	}
 
 	for _, network := range summarize.Networks {
 		if GetSwitchType(network.Name) == "NotFound" {
-			err := CreateSwitch(network, true)
-			if err != nil {
+			if err := CreateSwitch(network, true); err != nil {
 				return err
 			}
 		}
@@ -29,8 +26,7 @@ func BuildByStruct(summarize Summarize) error {
 			if vm.Count != 1 {
 				vm.Name += strconv.Itoa(i)
 			}
-			err := CreateVm(vm, true)
-			if err != nil {
+			if err := CreateVM(vm, true); err != nil {
 				return err
 			}
 		}

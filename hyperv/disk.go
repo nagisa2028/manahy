@@ -1,4 +1,3 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import (
@@ -8,19 +7,14 @@ import (
 	"strconv"
 )
 
-// ------------------ //
-// Create/Remove Disk
-// ------------------ //
-
+// CreateDisk creates a new virtual hard disk.
 func CreateDisk(newDisk Disk, output bool) error {
 	if newDisk.Import {
 		return nil
 	}
 
 	err := checkDiskParam(newDisk)
-	if output {
-		PrintError("Check Disk Param", err)
-	}
+	printError("Check Disk Param", err, output)
 	if err != nil {
 		return err
 	}
@@ -39,87 +33,51 @@ func CreateDisk(newDisk Disk, output bool) error {
 	}
 
 	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if output {
-		PrintError("Create Disk", err)
-	}
-	if err != nil {
-		return err
-	}
-	return nil
+	printError("Create Disk", err, output)
+	return err
 }
 
+// RemoveDisk deletes a virtual hard disk file.
 func RemoveDisk(path string, output bool) error {
-	err := isFileExist(path)
-	if err != nil {
+	if err := isFileExist(path); err != nil {
 		return err
 	}
 
-	err = exec.Command("powershell", "-NoProfile", "rm '"+path+"'").Run()
-	if output {
-		PrintError("Remove Disk", err)
-	}
-	if err != nil {
-		return err
-	}
-	return nil
+	err := exec.Command("powershell", "-NoProfile", "rm '"+path+"'").Run()
+	printError("Remove Disk", err, output)
+	return err
 }
-
-// ----------------- //
-// Check Disk Option
-// ----------------- //
 
 func checkDiskParam(newDisk Disk) error {
 	if newDisk.Import {
-		err := isFileExist(newDisk.Path)
-		if err != nil {
+		return isFileExist(newDisk.Path)
+	}
+	if err := isNotFileExist(newDisk.Path); err != nil {
+		return err
+	}
+	if err := checkDiskTypeParam(newDisk.Type); err != nil {
+		return err
+	}
+	if newDisk.Type == "differencing" {
+		if err := isFileExist(newDisk.ParentPath); err != nil {
 			return err
 		}
-		return nil
 	}
-	err := isNotFileExist(newDisk.Path)
-	if err != nil {
-		return err
-	}
-
-	err = checkDiskTypeParam(newDisk.Type)
-	if err != nil {
-		return err
-	}
-
-	switch newDisk.Type {
-	case "differencing":
-		err := isFileExist(newDisk.ParentPath)
-		if err != nil {
-			return err
-		}
-	case "fixed":
-	}
-
-	err = checkDiskSizeParam(newDisk.Size)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return checkDiskSizeParam(newDisk.Size)
 }
 
 func checkDiskTypeParam(diskType string) error {
 	switch diskType {
-	case "dynamic":
-	case "fixed":
-	case "differencing":
+	case "dynamic", "fixed", "differencing":
+		return nil
 	default:
-		return fmt.Errorf("error: Undefined disk type")
+		return fmt.Errorf("undefined disk type: %s", diskType)
 	}
-
-	return nil
 }
 
 func checkDiskSizeParam(diskSize string) error {
-	diskSize = regexp.MustCompile("^[0-9]*[TGM]B$").FindString(diskSize)
-	if diskSize == "" {
-		return fmt.Errorf("error: unknown size")
+	if regexp.MustCompile("^[0-9]*[TGM]B$").FindString(diskSize) == "" {
+		return fmt.Errorf("invalid disk size format: %s (expected e.g. 10GB)", diskSize)
 	}
-
 	return nil
 }
