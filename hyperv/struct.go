@@ -7,7 +7,7 @@ type Vm struct {
 	Count      int      `yaml:"count,omitempty"`
 	Generation int      `yaml:"generation" json:"generation"`
 	Cpu        Cpu      `yaml:"cpu" json:"cpu"`
-	Memory     Memory   `yaml:"memory" json:"network"`
+	Memory     Memory   `yaml:"memory" json:"memory"`
 	Path       string   `yaml:"path" json:"path"`
 	Image      string   `yaml:"image,omitempty" json:"image"`
 	Disks      []string `yaml:"disk"`
@@ -36,12 +36,12 @@ type Disk struct {
 	Import     bool   `yaml:"import,omitempty"`
 }
 
-// VMSwitch is Create switch option
+// VMSwitch is create switch option
 type VMSwitch struct {
-	Name               string `yaml:"name"`
-	Type               string `yaml:"type"`
-	ExternameInterface string `yaml:"extername-interface,omitempty"`
-	AllowManagementOs  bool   `yaml:"allow-management-os,omitempty"`
+	Name              string `yaml:"name"`
+	Type              string `yaml:"type"`
+	ExternalInterface string `yaml:"external-interface,omitempty"`
+	AllowManagementOs bool   `yaml:"allow-management-os,omitempty"`
 }
 
 // SwitchList is all type switch list
@@ -57,4 +57,19 @@ type VmList struct {
 	Saved   []string
 	Paused  []string
 	Off     []string
+}
+
+// StorageList is physical storage list
+type StorageList struct {
+	Number       []string
+	FriendlyName []string
+	Size         []float64
+	SizeUnit     []string
+}
+
+// Summarize is top-level structure for manahy.yaml
+type Summarize struct {
+	Vms      map[string]Vm       `yaml:"vms"`
+	Disks    map[string]Disk     `yaml:"disks"`
+	Networks map[string]VMSwitch `yaml:"networks"`
 }

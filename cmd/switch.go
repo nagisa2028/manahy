@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DevelopNaoki/manahy/modules"
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
@@ -24,21 +24,19 @@ var switchList = &cobra.Command{
 			switchListOption.all = false
 		}
 
-		switchList, err := modules.GetSwitchList()
+		switchList, err := hyperv.GetSwitchList()
 		if err != nil {
 			return err
 		}
 
 		if switchListOption.external || switchListOption.all {
-			displayList(switchList.External, "External Swotch's")
+			displayList(switchList.External, "External Switch's")
 		}
-
 		if switchListOption.internal || switchListOption.all {
-			displayList(switchList.Internal, "Internal Swotch's")
+			displayList(switchList.Internal, "Internal Switch's")
 		}
-
 		if switchListOption.private || switchListOption.all {
-			displayList(switchList.Private, "Private Swotch's")
+			displayList(switchList.Private, "Private Switch's")
 		}
 		return nil
 	},
@@ -51,15 +49,10 @@ var switchCreate = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if switchCreateOption.Name == "" || switchCreateOption.Type == "" {
 			return fmt.Errorf("error: Please specify switch name and switch type")
-		} else if switchCreateOption.Type == "external" && switchCreateOption.ExternameInterface == "" {
+		} else if switchCreateOption.Type == "external" && switchCreateOption.ExternalInterface == "" {
 			return fmt.Errorf("error: Please specify an external interface")
-		} else {
-			err := modules.CreateSwitch(switchCreateOption)
-			if err != nil {
-				return err
-			}
 		}
-		return nil
+		return hyperv.CreateSwitch(switchCreateOption, true)
 	},
 }
 
@@ -68,11 +61,7 @@ var switchRemove = &cobra.Command{
 	Short: "Remove switch",
 	Args:  cobra.RangeArgs(1, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := modules.RemoveSwitch(args[0])
-		if err != nil {
-			return err
-		}
-		return nil
+		return hyperv.RemoveSwitch(args[0])
 	},
 }
 
@@ -82,14 +71,9 @@ var switchRename = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if newSwitchName == "" {
-			return fmt.Errorf("error: need new switch name\n")
-		} else {
-			err := modules.RenameSwitch(args[0], newSwitchName)
-			if err != nil {
-				return err
-			}
+			return fmt.Errorf("error: need new switch name")
 		}
-		return nil
+		return hyperv.RenameSwitch(args[0], newSwitchName)
 	},
 }
 
@@ -106,11 +90,7 @@ var switchOptionCfgType = &cobra.Command{
 	Short: "Configure switch type",
 	Args:  cobra.RangeArgs(1, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := modules.ChangeSwitchType(args[0], switchType)
-		if err != nil {
-			return err
-		}
-		return nil
+		return hyperv.ChangeSwitchType(args[0], switchType)
 	},
 }
 
@@ -119,10 +99,6 @@ var switchOptionCfgNetAdapter = &cobra.Command{
 	Short: "Configure network adapter",
 	Args:  cobra.RangeArgs(1, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := modules.ChangeSwitchNetAdapter(args[0], netAdapter)
-		if err != nil {
-			return err
-		}
-		return nil
+		return hyperv.ChangeSwitchNetAdapter(args[0], netAdapter)
 	},
 }

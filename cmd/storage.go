@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DevelopNaoki/manahy/modules"
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ var storageList = &cobra.Command{
 	Short: "listing all storage",
 	Args:  cobra.RangeArgs(0, 0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		storageList, err := modules.GetStorageList()
+		storageList, err := hyperv.GetStorageList()
 		if err != nil {
 			return err
 		}

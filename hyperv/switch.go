@@ -61,9 +61,9 @@ func IsNotSwitchExist(name string) error {
 	return nil
 }
 
-// ---------------- //
-// Create/Remove Switch
-//  ---------------- //
+// ---------------------- //
+// Create / Remove Switch
+// ---------------------- //
 
 // CreateSwitch create new switch
 func CreateSwitch(newSwitch VMSwitch, output bool) error {
@@ -78,7 +78,7 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 
 	cmd = "New-VMSwitch -name '" + newSwitch.Name + "'"
 	if newSwitch.Type == "external" {
-		cmd += " -NetAdapterName '" + newSwitch.ExternameInterface + "'"
+		cmd += " -NetAdapterName '" + newSwitch.ExternalInterface + "'"
 		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOs)
 	} else {
 		cmd += " -SwitchType " + newSwitch.Type
@@ -96,13 +96,13 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 
 // RemoveSwitch remove switch
 func RemoveSwitch(name string) error {
-	if GetSwitchType(name) == "NotFound" {
-		return fmt.Errorf("error: %s does not exist", name)
-	} else {
-		err := exec.Command("powershell", "-NoProfile", "Remove-VMSwitch '"+name+"' -Force").Run()
-		if err != nil {
-			return err
-		}
+	err := IsSwitchExist(name)
+	if err != nil {
+		return err
+	}
+	err = exec.Command("powershell", "-NoProfile", "Remove-VMSwitch '"+name+"' -Force").Run()
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -115,14 +115,14 @@ func RemoveSwitch(name string) error {
 func RenameSwitch(name string, newName string) error {
 	err := IsSwitchExist(name)
 	if err != nil {
-		return nil
+		return err
 	}
 	err = IsNotSwitchExist(newName)
 	if err != nil {
-		return nil
+		return err
 	}
 
-	err = exec.Command("powershell", "-NoProfile", "Rename-VMSwitch '"+name+"' -NewName "+newName).Run()
+	err = exec.Command("powershell", "-NoProfile", "Rename-VMSwitch '"+name+"' -NewName '"+newName+"'").Run()
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func ChangeSwitchType(name string, switchType string) error {
 	return nil
 }
 
-// ChangeSwitchNetAdapter change netpadapter of external switch
+// ChangeSwitchNetAdapter change net adapter of external switch
 func ChangeSwitchNetAdapter(name string, netAdapter string) error {
 	nameType := GetSwitchType(name)
 	switch nameType {
@@ -184,7 +184,7 @@ func checkSwitchParam(newSwitch VMSwitch) error {
 		return err
 	}
 
-	err = checkSwitchParamIntegrity(newSwitch.Type, newSwitch.ExternameInterface)
+	err = checkSwitchParamIntegrity(newSwitch.Type, newSwitch.ExternalInterface)
 	if err != nil {
 		return err
 	}
@@ -202,11 +202,11 @@ func checkSwitchTypeParam(switchType string) error {
 	return nil
 }
 
-func checkSwitchParamIntegrity(switchType string, externameInterface string) error {
-	if switchType == "external" && externameInterface == "" {
-		return fmt.Errorf("need externameInterface option")
-	} else if switchType != "external" && externameInterface != "" {
-		return fmt.Errorf("do not need externameInterface option")
+func checkSwitchParamIntegrity(switchType string, externalInterface string) error {
+	if switchType == "external" && externalInterface == "" {
+		return fmt.Errorf("need external-interface option")
+	} else if switchType != "external" && externalInterface != "" {
+		return fmt.Errorf("do not need external-interface option")
 	}
 	return nil
 }

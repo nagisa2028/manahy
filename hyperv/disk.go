@@ -40,7 +40,7 @@ func CreateDisk(newDisk Disk, output bool) error {
 
 	err = exec.Command("powershell", "-NoProfile", cmd).Run()
 	if output {
-		PrintError("Creat Disk", err)
+		PrintError("Create Disk", err)
 	}
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func checkDiskParam(newDisk Disk) error {
 	}
 	err := isNotFileExist(newDisk.Path)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	err = checkDiskTypeParam(newDisk.Type)
@@ -92,7 +92,7 @@ func checkDiskParam(newDisk Disk) error {
 		if err != nil {
 			return err
 		}
-	case "Fixed":
+	case "fixed":
 	}
 
 	err = checkDiskSizeParam(newDisk.Size)

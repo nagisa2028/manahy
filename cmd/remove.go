@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DevelopNaoki/manahy/modules"
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
@@ -11,22 +11,23 @@ var remove = &cobra.Command{
 	Use:   "remove",
 	Short: "remove vm, disk and switch from manahy.yaml",
 	Run: func(cmd *cobra.Command, args []string) {
-		data, err := modules.UnmarshalYaml("manahy.yaml")
+		data, err := hyperv.UnmarshalYaml("manahy.yaml")
 		if err != nil {
-			fmt.Printf("%w\n", err)
+			fmt.Printf("%s\n", err)
+			return
 		}
 
-		for i := range data.Disks {
-			err = modules.RemoveDisk(data.Disks[i].Path)
+		for _, disk := range data.Disks {
+			err = hyperv.RemoveDisk(disk.Path, false)
 			if err != nil {
-				fmt.Printf("%w\n", err)
+				fmt.Printf("%s\n", err)
 			}
 		}
 
-		for i := range data.Networks {
-			err = modules.RemoveSwitch(data.Networks[i].Name)
+		for _, network := range data.Networks {
+			err = hyperv.RemoveSwitch(network.Name)
 			if err != nil {
-				fmt.Printf("%w\n", err)
+				fmt.Printf("%s\n", err)
 			}
 		}
 	},

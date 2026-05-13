@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DevelopNaoki/manahy/modules"
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ var vmList = &cobra.Command{
 			vmListOption.active = false
 		}
 
-		vmList, err := modules.GetVmList()
+		vmList, err := hyperv.GetVmList()
 		if err != nil {
 			return err
 		}
@@ -32,15 +32,12 @@ var vmList = &cobra.Command{
 		if vmListOption.active || vmListOption.all {
 			displayList(vmList.Running, "Running VM's")
 		}
-
 		if vmListOption.saved || vmListOption.all {
 			displayList(vmList.Saved, "Saved VM's")
 		}
-
 		if vmListOption.paused || vmListOption.all {
 			displayList(vmList.Paused, "Paused VM's")
 		}
-
 		if vmListOption.inactive || vmListOption.all {
 			displayList(vmList.Off, "Inactive VM's")
 		}
@@ -54,7 +51,7 @@ var vmState = &cobra.Command{
 	Short: "Print VM state",
 	Args:  cobra.RangeArgs(1, 1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(modules.GetVmState(args[0]) + "\n")
+		fmt.Print(hyperv.GetVmState(args[0]) + "\n")
 	},
 }
 
@@ -71,12 +68,7 @@ var vmCreate = &cobra.Command{
 			vm.Networks = append(vm.Networks, vmSwitch)
 		}
 
-		err := modules.CreateVm(vm)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return hyperv.CreateVm(vm, true)
 	},
 }
 
@@ -85,8 +77,8 @@ var vmRemove = &cobra.Command{
 	Short: "remove VM",
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		for _, index := range args {
-			err := modules.RemoveVm(index)
+		for _, name := range args {
+			err := hyperv.RemoveVm(name, false)
 			if err != nil {
 				return err
 			}
@@ -102,13 +94,8 @@ var vmRename = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if newVmName == "" {
 			return fmt.Errorf("error: need new vm name")
-		} else {
-			err := modules.RenameVm(args[0], newVmName)
-			if err != nil {
-				return err
-			}
 		}
-		return nil
+		return hyperv.RenameVm(args[0], newVmName)
 	},
 }
 
@@ -118,8 +105,7 @@ var vmStart = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.StartVm(vmName)
-			if err != nil {
+			if err := hyperv.StartVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -133,8 +119,7 @@ var vmSave = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.SaveVm(vmName)
-			if err != nil {
+			if err := hyperv.SaveVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -148,8 +133,7 @@ var vmShutdown = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.StopVm(vmName)
-			if err != nil {
+			if err := hyperv.StopVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -163,8 +147,7 @@ var vmDestroy = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.DestroyVm(vmName)
-			if err != nil {
+			if err := hyperv.DestroyVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -178,8 +161,7 @@ var vmSuspend = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.SuspendVm(vmName)
-			if err != nil {
+			if err := hyperv.SuspendVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -193,8 +175,7 @@ var vmRestart = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.RestartVm(vmName)
-			if err != nil {
+			if err := hyperv.RestartVm(vmName); err != nil {
 				return err
 			}
 		}
@@ -208,8 +189,7 @@ var vmConnect = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, vmName := range args {
-			err := modules.ConnectVm(vmName)
-			if err != nil {
+			if err := hyperv.ConnectVm(vmName); err != nil {
 				return err
 			}
 		}

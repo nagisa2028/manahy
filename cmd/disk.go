@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DevelopNaoki/manahy/modules"
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
@@ -20,10 +20,6 @@ var diskCreate = &cobra.Command{
 	Short: "Create virtual disk",
 	Args:  cobra.RangeArgs(0, 0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := modules.CreateDisk(diskCreateOption)
-		if err != nil {
-			return err
-		}
-		return nil
+		return hyperv.CreateDisk(diskCreateOption, true)
 	},
 }

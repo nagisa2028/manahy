@@ -4,6 +4,7 @@ package hyperv
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -64,9 +65,59 @@ func switchListingOfExecuteResults(res []byte) (switchList SwitchList, err error
 			case "Private":
 				switchList.Private = append(switchList.Private, split[i])
 			default:
-				return switchList, fmt.Errorf("unknown error forlisting  switch's")
+				return switchList, fmt.Errorf("unknown error for listing switch's")
 			}
 		}
 	}
 	return switchList, nil
+}
+
+func storageListingOfExecuteResults(res []byte) (storageList StorageList, err error) {
+	split := regexp.MustCompile(newLine).Split(string(res), -1)
+	for i := range split {
+		split[i] = strings.TrimSpace(split[i])
+		if !strings.Contains(split[i], "Number") && !regexp.MustCompile(spaceChar).Match([]byte(split[i])) {
+			storageList.Number = append(storageList.Number, regexp.MustCompile("^[0-9]+").FindString(split[i]))
+			split[i] = regexp.MustCompile("^[0-9]+").ReplaceAllString(split[i], "")
+
+			storageSize, storageSizeUnit, err := computeCapacity(regexp.MustCompile("[0-9]+$").FindString(split[i]))
+			if err != nil {
+				return storageList, err
+			}
+			storageList.Size = append(storageList.Size, storageSize)
+			storageList.SizeUnit = append(storageList.SizeUnit, storageSizeUnit)
+			split[i] = regexp.MustCompile("[0-9]+$").ReplaceAllString(split[i], "")
+
+			split[i] = strings.TrimSpace(split[i])
+			storageList.FriendlyName = append(storageList.FriendlyName, split[i])
+		}
+	}
+	return storageList, nil
+}
+
+func computeCapacity(raw string) (processing float64, unit string, err error) {
+	var parseErr error
+	processing, parseErr = strconv.ParseFloat(raw, 64)
+	if parseErr != nil {
+		return 0, "", fmt.Errorf("error: in type conversion")
+	}
+	unit = "B"
+	for processing >= 1024 {
+		processing = processing / 1024
+		switch unit {
+		case "B":
+			unit = "KB"
+		case "KB":
+			unit = "MB"
+		case "MB":
+			unit = "GB"
+		case "GB":
+			unit = "TB"
+		case "TB":
+			unit = "PB"
+		default:
+			return 0, "", fmt.Errorf("error: %s is undefined", unit)
+		}
+	}
+	return
 }
