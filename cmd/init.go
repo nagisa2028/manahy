@@ -13,6 +13,8 @@ func init() {
 		diskCmd,
 		storageCmd,
 		memberCmd,
+		checkpointCmd,
+		hostCmd,
 		build,
 		remove,
 	)
@@ -32,7 +34,24 @@ func init() {
 		vmSuspend,
 		vmRestart,
 		vmConnect,
+		vmResume,
+		vmExport,
+		vmImport,
+		vmMove,
+		vmCopy,
+		vmInfo,
+		vmMeasure,
+		vmIntegrationCmd,
 	)
+
+	vmIntegrationCmd.AddCommand(
+		vmIntegrationList,
+		vmIntegrationEnable,
+		vmIntegrationDisable,
+	)
+
+	vmIntegrationEnable.Flags().StringVarP(&integrationServiceName, "name", "n", "", "integration service name")
+	vmIntegrationDisable.Flags().StringVarP(&integrationServiceName, "name", "n", "", "integration service name")
 
 	vmList.Flags().BoolVarP(&vmListOption.active, "active", "", true, "list active vm's")
 	vmList.Flags().BoolVarP(&vmListOption.inactive, "inactive", "i", false, "list inactive vm's")
@@ -41,6 +60,10 @@ func init() {
 	vmList.Flags().BoolVarP(&vmListOption.all, "all", "a", false, "list all vm's")
 
 	vmRename.Flags().StringVarP(&newVMName, "new-name", "n", "", "new vm name")
+	vmExport.Flags().StringVarP(&exportPath, "path", "p", "", "export destination directory")
+	vmMove.Flags().StringVarP(&exportPath, "path", "p", "", "destination storage directory")
+	vmCopy.Flags().StringVarP(&newVMName, "new-name", "n", "", "new vm name")
+	vmCopy.Flags().StringVarP(&exportPath, "path", "p", "", "directory for exported source files")
 
 	vmCreate.Flags().StringVarP(&vm.Name, "name", "n", "", "new vm name")
 	vmCreate.Flags().IntVarP(&vm.Generation, "generation", "g", 1, "set vm generation")
@@ -106,4 +129,25 @@ func init() {
 		memberAddCmd,
 		memberRemoveCmd,
 	)
+}
+
+func init() {
+	checkpointCmd.AddCommand(
+		checkpointCreate,
+		checkpointList,
+		checkpointRestore,
+		checkpointRemove,
+		checkpointRename,
+		checkpointExport,
+	)
+
+	checkpointCreate.Flags().StringVarP(&checkpointName, "name", "n", "", "checkpoint name")
+	checkpointRestore.Flags().StringVarP(&checkpointName, "name", "n", "", "checkpoint name")
+	checkpointRemove.Flags().StringVarP(&checkpointName, "name", "n", "", "checkpoint name")
+	checkpointRename.Flags().StringVarP(&checkpointName, "name", "n", "", "checkpoint name")
+	checkpointRename.Flags().StringVarP(&newCheckpointName, "new-name", "", "", "new checkpoint name")
+	checkpointExport.Flags().StringVarP(&checkpointName, "name", "n", "", "checkpoint name")
+	checkpointExport.Flags().StringVarP(&exportPath, "path", "p", "", "export destination directory")
+
+	hostCmd.AddCommand(hostShow)
 }

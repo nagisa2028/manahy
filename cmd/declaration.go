@@ -28,3 +28,8 @@ var switchCreateOption hyperv.VMSwitch
 var newSwitchName string
 var switchType string
 var netAdapter string
+
+var exportPath string
+var checkpointName string
+var newCheckpointName string
+var integrationServiceName string

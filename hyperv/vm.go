@@ -260,6 +260,52 @@ func RestartVM(name string) error {
 	return exec.Command("powershell", "-NoProfile", "Restart-VM -Name '"+name+"' -Force").Run()
 }
 
+// ResumeVM resumes a paused VM.
+func ResumeVM(name string) error {
+	if GetVMState(name) != "Paused" {
+		return fmt.Errorf("VM %s is not paused", name)
+	}
+	return exec.Command("powershell", "-NoProfile", "Resume-VM -Name '"+name+"'").Run()
+}
+
+// ExportVM exports a VM to the specified directory.
+func ExportVM(name, path string) error {
+	if err := IsVMExist(name); err != nil {
+		return err
+	}
+	return exec.Command("powershell", "-NoProfile", "Export-VM -Name '"+name+"' -Path '"+path+"'").Run()
+}
+
+// ImportVM registers a VM from a .vmcx file path.
+func ImportVM(path string) error {
+	return exec.Command("powershell", "-NoProfile", "Import-VM -Path '"+path+"'").Run()
+}
+
+// MoveVMStorage moves all VM storage files to a new directory on the same host.
+func MoveVMStorage(name, destPath string) error {
+	if err := IsVMExist(name); err != nil {
+		return err
+	}
+	return exec.Command("powershell", "-NoProfile",
+		"Move-VMStorage -VMName '"+name+"' -DestinationStoragePath '"+destPath+"'").Run()
+}
+
+// CopyVM exports the source VM then imports it as a new VM with a different name.
+// The exported files are placed under destPath and remain after the copy completes.
+func CopyVM(name, newName, destPath string) error {
+	if err := IsVMExist(name); err != nil {
+		return err
+	}
+	if err := IsNotVMExist(newName); err != nil {
+		return err
+	}
+	script := "Export-VM -Name '" + name + "' -Path '" + destPath + "'; " +
+		"$vmcx = (Get-ChildItem -Recurse -Path '" + destPath + "\\" + name + "' -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
+		"$newVM = Import-VM -Path $vmcx -Copy -GenerateNewId; " +
+		"Rename-VM -VM $newVM -NewName '" + newName + "'"
+	return exec.Command("powershell", "-NoProfile", script).Run()
+}
+
 func checkVMParam(newVM VM) error {
 	if err := IsNotVMExist(newVM.Name); err != nil {
 		return err
