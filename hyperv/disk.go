@@ -107,7 +107,7 @@ func GetVHDInfo(path string) (string, error) {
 	}
 	res, err := outputPS(cmdGetVHD + " -Path " + ps(path) + " | Format-List Path, VhdType, FileSize, Size, ParentPath, Attached, DiskNumber")
 	if err != nil {
-		return "", fmt.Errorf("failed to get VHD info for %s", path)
+		return "", fmt.Errorf("failed to get VHD info for %s: %w", path, err)
 	}
 	return string(res), nil
 }

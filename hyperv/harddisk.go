@@ -9,7 +9,7 @@ func GetVMHardDiskDrives(vmName string) (string, error) {
 	}
 	res, err := outputPS(cmdGetVMHardDiskDrive + " -VMName " + ps(vmName) + " | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get hard disk drives for VM %s", vmName)
+		return "", fmt.Errorf("failed to get hard disk drives for VM %s: %w", vmName, err)
 	}
 	return string(res), nil
 }

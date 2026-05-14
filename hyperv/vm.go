@@ -163,7 +163,7 @@ func CreateVM(newVM VM, output bool) error {
 	err = runPS(cmd)
 	printError("Create VM", err, output)
 	if err != nil {
-		return fmt.Errorf("failed to create VM %s", newVM.Name)
+		return fmt.Errorf("failed to create VM %s: %w", newVM.Name, err)
 	}
 
 	err = SetVMProcessor(newVM.Name, newVM.CPU)

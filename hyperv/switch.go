@@ -14,7 +14,7 @@ func GetSwitchInfo(name string) (string, error) {
 	out, err := outputPS(cmdGetVMSwitch + " -Name " + ps(name) +
 		" | Format-List Name, SwitchType, NetAdapterInterfaceDescription, AllowManagementOS, Notes | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get info for switch %s", name)
+		return "", fmt.Errorf("failed to get info for switch %s: %w", name, err)
 	}
 	return string(out), nil
 }
@@ -82,7 +82,7 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 	err = runPS(cmd)
 	printError("Create Switch", err, output)
 	if err != nil {
-		return fmt.Errorf("failed to create switch %s", newSwitch.Name)
+		return fmt.Errorf("failed to create switch %s: %w", newSwitch.Name, err)
 	}
 	return nil
 }

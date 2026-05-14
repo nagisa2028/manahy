@@ -1,6 +1,9 @@
 package hyperv
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // GetVMNetworkAdapters returns network adapters attached to a VM.
 func GetVMNetworkAdapters(vmName string) (string, error) {
@@ -9,7 +12,7 @@ func GetVMNetworkAdapters(vmName string) (string, error) {
 	}
 	res, err := outputPS(cmdGetVMNetworkAdapter + " -VMName " + ps(vmName) + " | Format-Table Name, SwitchName, MacAddress, Status | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get network adapters for VM %s", vmName)
+		return "", fmt.Errorf("failed to get network adapters for VM %s: %w", vmName, err)
 	}
 	return string(res), nil
 }
@@ -62,10 +65,10 @@ func SetVMNetworkAdapterVlan(vmName, name string, vlanID int) error {
 		cmd = cmdSetVMNetworkAdapterVlan + " -VMName " + ps(vmName) + " -VMNetworkAdapterName " + ps(name) + " -Untagged"
 	} else {
 		cmd = cmdSetVMNetworkAdapterVlan + " -VMName " + ps(vmName) + " -VMNetworkAdapterName " + ps(name) +
-			" -Access -VlanId " + fmt.Sprintf("%d", vlanID)
+			" -Access -VlanId " + strconv.Itoa(vlanID)
 	}
 	if err := runPS(cmd); err != nil {
-		return fmt.Errorf("failed to set VLAN for adapter %s on VM %s", name, vmName)
+		return fmt.Errorf("failed to set VLAN for adapter %s on VM %s: %w", name, vmName, err)
 	}
 	return nil
 }

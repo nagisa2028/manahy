@@ -11,7 +11,7 @@ func GetVMInfo(name string) (string, error) {
 		cmdGetVMMemory + " -VMName " + ps(name) + " | Format-List VMName, DynamicMemoryEnabled, Startup, Minimum, Maximum, Buffer, Priority"
 	out, err := outputPS(script)
 	if err != nil {
-		return "", fmt.Errorf("failed to get info for VM %s", name)
+		return "", fmt.Errorf("failed to get info for VM %s: %w", name, err)
 	}
 	return string(out), nil
 }
@@ -26,7 +26,7 @@ func MeasureVM(name string) (string, error) {
 		cmdMeasureVM + " -VMName " + ps(name) + " | Format-List AvgCPUUsage, AvgRAMUsage, TotalDisk, NetworkMeteredTrafficReport"
 	out, err := outputPS(script)
 	if err != nil {
-		return "", fmt.Errorf("failed to measure VM %s", name)
+		return "", fmt.Errorf("failed to measure VM %s: %w", name, err)
 	}
 	return string(out), nil
 }
@@ -38,7 +38,7 @@ func GetVMIntegrationServices(name string) (string, error) {
 	}
 	out, err := outputPS(cmdGetVMIntegrationService + " -VMName " + ps(name) + " | Format-Table Name, Enabled, PrimaryStatusDescription | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get integration services for VM %s", name)
+		return "", fmt.Errorf("failed to get integration services for VM %s: %w", name, err)
 	}
 	return string(out), nil
 }
@@ -63,7 +63,7 @@ func DisableVMIntegrationService(name, service string) error {
 func GetVMHost() (string, error) {
 	out, err := outputPS(cmdGetVMHost + " | Format-List VirtualHardDiskPath, VirtualMachinePath, MacAddressMinimum, MacAddressMaximum, NumaSpanningEnabled, EnableEnhancedSessionMode, MaximumVirtualMachineMigrations, MaximumStorageMigrations")
 	if err != nil {
-		return "", fmt.Errorf("failed to get Hyper-V host information")
+		return "", fmt.Errorf("failed to get Hyper-V host information: %w", err)
 	}
 	return string(out), nil
 }

@@ -9,7 +9,7 @@ func GetVMDvdDrives(vmName string) (string, error) {
 	}
 	res, err := outputPS(cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get DVD drives for VM %s", vmName)
+		return "", fmt.Errorf("failed to get DVD drives for VM %s: %w", vmName, err)
 	}
 	return string(res), nil
 }

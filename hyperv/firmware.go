@@ -18,7 +18,7 @@ func SetVMSecureBoot(name string, enabled bool, template string) error {
 		cmd += " -SecureBootTemplate " + ps(template)
 	}
 	if err := runPS(cmd); err != nil {
-		return fmt.Errorf("failed to set Secure Boot for VM %s", name)
+		return fmt.Errorf("failed to set Secure Boot for VM %s: %w", name, err)
 	}
 	return nil
 }
@@ -31,7 +31,7 @@ func GetVMFirmware(name string) (string, error) {
 	out, err := outputPS(cmdGetVMFirmware + " -VMName " + ps(name) +
 		" | Format-List SecureBoot, SecureBootTemplate, PreferredNetworkBootProtocol, BootOrder | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get firmware info for VM %s", name)
+		return "", fmt.Errorf("failed to get firmware info for VM %s: %w", name, err)
 	}
 	return string(out), nil
 }

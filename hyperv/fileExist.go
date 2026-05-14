@@ -9,11 +9,11 @@ import (
 func searchFilePath(path string) (bool, error) {
 	res, e := outputPS(cmdTestPath + " " + ps(path))
 	if e != nil {
-		return false, fmt.Errorf("failed to execute Test-Path")
+		return false, fmt.Errorf("failed to execute Test-Path: %w", e)
 	}
 	exist, err := strconv.ParseBool(strings.TrimSpace(string(res)))
 	if err != nil {
-		return false, fmt.Errorf("unexpected Test-Path output for %s", path)
+		return false, fmt.Errorf("unexpected Test-Path output for %s: %w", path, err)
 	}
 	return exist, nil
 }

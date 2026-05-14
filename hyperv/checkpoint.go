@@ -21,7 +21,7 @@ func GetCheckpoints(vmName string) (string, error) {
 	}
 	out, err := outputPS(cmdGetVMCheckpoint + " -VMName " + ps(vmName) + " | Sort-Object CreationTime | Format-Table Name, CreationTime | Out-String")
 	if err != nil {
-		return "", fmt.Errorf("failed to get checkpoints for VM %s", vmName)
+		return "", fmt.Errorf("failed to get checkpoints for VM %s: %w", vmName, err)
 	}
 	return string(out), nil
 }

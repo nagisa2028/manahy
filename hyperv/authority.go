@@ -6,7 +6,7 @@ import "fmt"
 func GetGroupMember() ([]string, error) {
 	res, err := outputPS("(" + cmdGetLocalGroupMember + " -Group " + ps(hvAdminsGroup) + " | Format-Table Name | Out-String).Trim()")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Hyper-V Administrators members")
+		return nil, fmt.Errorf("failed to get Hyper-V Administrators members: %w", err)
 	}
 
 	var members []string
@@ -25,7 +25,7 @@ func GetGroupMember() ([]string, error) {
 func AddGroupMember(name string) error {
 	_, err := outputPS(cmdAddLocalGroupMember + " -Group " + ps(hvAdminsGroup) + " -Member " + ps(name))
 	if err != nil {
-		return fmt.Errorf("failed to add %s to Hyper-V Administrators", name)
+		return fmt.Errorf("failed to add %s to Hyper-V Administrators: %w", name, err)
 	}
 	return nil
 }
@@ -34,7 +34,7 @@ func AddGroupMember(name string) error {
 func RemoveGroupMember(name string) error {
 	_, err := outputPS(cmdRemoveLocalGroupMember + " -Group " + ps(hvAdminsGroup) + " -Member " + ps(name))
 	if err != nil {
-		return fmt.Errorf("failed to remove %s from Hyper-V Administrators", name)
+		return fmt.Errorf("failed to remove %s from Hyper-V Administrators: %w", name, err)
 	}
 	return nil
 }
