@@ -215,6 +215,19 @@ vms:
       - internal-net
 ```
 
+#### Disk behaviour with `count > 1`
+
+When `count` is greater than 1, each VM instance gets its **own numbered disk copy**.
+The numeric suffix is inserted before the file extension:
+
+| alias | `count` | disks created |
+|-------|---------|---------------|
+| `boot-disk` (`C:\VMs\boot.vhd`) | `3` | `boot1.vhd`, `boot2.vhd`, `boot3.vhd` |
+
+`remove` deletes the same numbered copies; the base path (e.g. `boot.vhd`) is never touched.
+
+Disks marked `import: true` are treated as **read-only references** and are shared across all instances without copying or deletion.
+
 ### build / remove
 
 ```
@@ -225,13 +238,15 @@ vms:
 > manahy remove             # remove all resources defined in the config
 ```
 
-`--dry-run` output example:
+`--dry-run` output example (with `count: 3`):
 
 ```
 [dry-run] build
-  disk      boot-disk                 create    C:\VMs\boot.vhd (50GB, dynamic)
-  network   internal-net              create    internal
+  disk      boot-disk1                create    C:\VMs\boot1.vhd (50GB, dynamic)
   vm        web1                      create    gen2, 2GB, 2 vCPU
+  disk      boot-disk2                create    C:\VMs\boot2.vhd (50GB, dynamic)
   vm        web2                      create    gen2, 2GB, 2 vCPU
+  disk      boot-disk3                create    C:\VMs\boot3.vhd (50GB, dynamic)
   vm        web3                      create    gen2, 2GB, 2 vCPU
+  network   internal-net              create    internal
 ```
