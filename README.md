@@ -1,37 +1,237 @@
 # manahy
-manahy is management tool on hyper-v
-- Works only on Windows
 
-See implementedFeature.md for implemented features.
+manahy is a management tool for Hyper-V, operated from the command line.
+
+- **Windows only** — requires Hyper-V to be enabled and PowerShell available
+- Membership in the **Hyper-V Administrators** group is required (or run as Administrator)
 
 ## Setup
+
+### Build from source
+
 ```
 > go mod download
 > go build
 ```
-If you are using other codes instead of ASCII codes, please change the character code used in configCharCode.bat.
+
+### Character encoding (non-ASCII environments)
+
+If PowerShell output appears garbled (e.g. Japanese locale), run the bundled script once per console session to switch the code page to UTF-8:
+
 ```
->.\configCharCode.bat
+> .\configCharCode.bat
 ```
 
-## Usage
+This executes `chcp 65001` internally. Alternatively, set it permanently via Windows regional settings or add it to your PowerShell profile.
+
+## Environment check
+
+Before first use, verify that Hyper-V is enabled and all required cmdlets are available:
+
 ```
-> manahy.exe -h
-manahy is management tool on Hyper-V
+> manahy host check
+```
 
-Usage:
-  manahy [flags]
-  manahy [command]
+Subcommands for per-category detail:
 
-Available Commands:
-  completion  generate the autocompletion script for the specified shell
-  disk        disk is management virtual disk
-  help        Help about any command
-  switch      management switch on Hyper-V
-  vm          vm is management vm on Hyper-V
+```
+> manahy host check vm
+> manahy host check disk
+> manahy host check network
+```
 
-Flags:
-  -h, --help   help for manahy
+## Global flags
 
-Use "manahy [command] --help" for more information about a command.
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--config` | `-c` | `manahy.yaml` | Config file path (used by `build` / `remove` and for disk alias resolution) |
+| `--help` | `-h` | | Show help |
+
+The `-c` flag is inherited by all subcommands:
+
+```
+> manahy -c infra.yaml build
+> manahy -c infra.yaml disk info test-disk
+```
+
+## Commands
+
+### vm — virtual machine management
+
+```
+> manahy vm list
+> manahy vm state <name>
+> manahy vm create -n <name> -m <memory> -p <path> [options]
+> manahy vm remove <name> [name...]
+> manahy vm rename <name> --new-name <new>
+> manahy vm start   <name> [name...]
+> manahy vm shutdown <name> [name...]
+> manahy vm destroy  <name> [name...]
+> manahy vm save     <name> [name...]
+> manahy vm suspend  <name> [name...]
+> manahy vm resume   <name> [name...]
+> manahy vm restart  <name> [name...]
+> manahy vm connect  <name>
+> manahy vm export   <name> --path <dir>
+> manahy vm import   <path>
+> manahy vm move     <name> --path <dir>
+> manahy vm copy     <name> --new-name <new> --path <dir>
+> manahy vm info     <name>
+> manahy vm measure  <name>
+> manahy vm integration list   <name>
+> manahy vm integration enable  <name> --name <service>
+> manahy vm integration disable <name> --name <service>
+```
+
+`vm create` options:
+
+| Flag | Short | Description |
+|---|---|---|
+| `--name` | `-n` | VM name (required) |
+| `--memory` | `-m` | Memory size, e.g. `512MB`, `2GB` (required) |
+| `--path` | `-p` | Directory to store VM files (required) |
+| `--generation` | `-g` | VM generation: `1` or `2` (default: `1`) |
+| `--vcpus` | `-v` | vCPU count (default: `1`) |
+| `--nested` | | Enable nested virtualization |
+| `--nodynamic` | | Disable dynamic memory |
+| `--disk` | `-d` | VHD path or config alias |
+| `--network` | `-s` | Virtual switch name |
+| `--image` | `-i` | ISO image path |
+
+### disk — virtual disk (VHD) management
+
+```
+> manahy disk create --path <path> --size <size> --type <type>
+> manahy disk remove <path>
+> manahy disk info   <path>
+> manahy disk resize <path> --size <size>
+> manahy disk optimize <path>
+> manahy disk convert  <path> --dest <dest>
+> manahy disk mount    <path>
+> manahy disk dismount <path>
+> manahy disk merge    <path>
+```
+
+Disk types: `dynamic`, `fixed`, `differencing`
+
+### switch — virtual switch management
+
+```
+> manahy switch list
+> manahy switch create -n <name> -t <type> [--external-interface <adapter>]
+> manahy switch remove <name>
+> manahy switch rename <name> --new-name <new>
+> manahy switch configure type    <name> --type <type>
+> manahy switch configure adapter <name> --adapter <adapter>
+```
+
+Switch types: `external`, `internal`, `private`
+
+### checkpoint — VM checkpoint management
+
+```
+> manahy checkpoint create <vm> [--name <name>]
+> manahy checkpoint list   <vm>
+> manahy checkpoint restore <vm> --name <name>
+> manahy checkpoint remove  <vm> --name <name>
+> manahy checkpoint rename  <vm> --name <name> --new-name <new>
+> manahy checkpoint export  <vm> --name <name> --path <dir>
+```
+
+### dvd — VM DVD drive management
+
+```
+> manahy dvd list   <vm>
+> manahy dvd add    <vm>
+> manahy dvd remove <vm>
+> manahy dvd set    <vm> --image <iso>
+> manahy dvd eject  <vm>
+```
+
+### nic — VM network adapter management
+
+```
+> manahy nic list    <vm>
+> manahy nic add     <vm> [--name <name>] [--switch <switch>]
+> manahy nic remove  <vm> --name <name>
+> manahy nic connect <vm> --name <name> --switch <switch>
+```
+
+### host — host information and management
+
+```
+> manahy host show
+> manahy host check [vm|disk|network]
+> manahy host member list
+> manahy host member add    <user> [user...]
+> manahy host member remove <user> [user...]
+> manahy host storage list
+```
+
+## Config file (manahy.yaml)
+
+`build` and `remove` operate on all resources defined in the config file at once.
+The map key is the resource name; no separate `name:` field is needed.
+Disk map keys can be used as **aliases** in VM `disks:` lists.
+
+```yaml
+disks:
+  boot-disk:            # alias used in vm disks list below
+    path: C:\VMs\boot.vhd
+    size: 50GB
+    type: dynamic
+  data-disk:
+    path: C:\VMs\data.vhd
+    size: 100GB
+    type: dynamic
+  existing-disk:
+    path: C:\VMs\existing.vhd
+    import: true        # skip creation; treat as already existing
+
+networks:
+  internal-net:
+    type: internal
+  external-net:
+    type: external
+    external-interface: Ethernet
+    allow-management-os: true
+
+vms:
+  web:
+    count: 3            # creates web1, web2, web3
+    generation: 2
+    memory:
+      size: 2GB
+      dynamic: true
+    cpu:
+      thread: 2
+      nested: false
+    path: C:\VMs
+    image: C:\ISOs\debian.iso
+    disks:
+      - boot-disk       # resolved to C:\VMs\boot.vhd
+      - data-disk
+    networks:
+      - internal-net
+```
+
+### build / remove
+
+```
+> manahy build              # uses manahy.yaml
+> manahy -c infra.yaml build
+> manahy build --dry-run    # preview what would be created
+> manahy remove --dry-run   # preview what would be removed
+> manahy remove             # remove all resources defined in the config
+```
+
+`--dry-run` output example:
+
+```
+[dry-run] build
+  disk      boot-disk                 create    C:\VMs\boot.vhd (50GB, dynamic)
+  network   internal-net              create    internal
+  vm        web1                      create    gen2, 2GB, 2 vCPU
+  vm        web2                      create    gen2, 2GB, 2 vCPU
+  vm        web3                      create    gen2, 2GB, 2 vCPU
 ```
