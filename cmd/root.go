@@ -27,8 +27,6 @@ func newRootCmd() *cobra.Command {
 		newVMCmd(&configFile),
 		newSwitchCmd(),
 		newDiskCmd(&configFile),
-		newStorageCmd(),
-		newMemberCmd(),
 		newCheckpointCmd(),
 		newHostCmd(),
 		newBuildCmd(&configFile),

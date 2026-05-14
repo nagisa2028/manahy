@@ -15,7 +15,11 @@ func newHostCmd() *cobra.Command {
 			return fmt.Errorf("need valid command")
 		},
 	}
-	cmd.AddCommand(newHostShowCmd())
+	cmd.AddCommand(
+		newHostShowCmd(),
+		newMemberCmd(),
+		newStorageCmd(),
+	)
 	return cmd
 }
 
