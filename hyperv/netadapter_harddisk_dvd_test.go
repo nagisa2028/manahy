@@ -418,6 +418,105 @@ func TestRemoveVMDvdDrive(t *testing.T) {
 	})
 }
 
+func TestSetVMNetworkAdapterVlan(t *testing.T) {
+	t.Run("VM exists sets VLAN access mode with ID in command", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error {
+				capturedCmd = c
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return vmRunningOutput(), nil
+			},
+		)
+		if err := SetVMNetworkAdapterVlan("my-vm", "eth0", 100); err != nil {
+			t.Fatalf("SetVMNetworkAdapterVlan: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-Access") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q does not contain '-Access'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "100") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q does not contain '100'", capturedCmd)
+		}
+		if strings.Contains(capturedCmd, "-Untagged") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q should not contain '-Untagged'", capturedCmd)
+		}
+	})
+
+	t.Run("vlanID 0 sets Untagged mode", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error {
+				capturedCmd = c
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return vmRunningOutput(), nil
+			},
+		)
+		if err := SetVMNetworkAdapterVlan("my-vm", "eth0", 0); err != nil {
+			t.Fatalf("SetVMNetworkAdapterVlan: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-Untagged") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q does not contain '-Untagged'", capturedCmd)
+		}
+		if strings.Contains(capturedCmd, "-Access") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q should not contain '-Access'", capturedCmd)
+		}
+	})
+
+	t.Run("adapter name included in command", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error {
+				capturedCmd = c
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return vmRunningOutput(), nil
+			},
+		)
+		if err := SetVMNetworkAdapterVlan("my-vm", "my-adapter", 10); err != nil {
+			t.Fatalf("SetVMNetworkAdapterVlan: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "my-adapter") {
+			t.Errorf("SetVMNetworkAdapterVlan: command %q does not contain 'my-adapter'", capturedCmd)
+		}
+	})
+
+	t.Run("PS error returns wrapped error message", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error {
+				return errors.New("ps error")
+			},
+			func(_ string) ([]byte, error) {
+				return vmRunningOutput(), nil
+			},
+		)
+		err := SetVMNetworkAdapterVlan("my-vm", "eth0", 100)
+		if err == nil {
+			t.Fatal("SetVMNetworkAdapterVlan: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to set VLAN") {
+			t.Errorf("SetVMNetworkAdapterVlan: error %q does not contain 'failed to set VLAN'", err.Error())
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, vmMissingErr()
+		})
+		err := SetVMNetworkAdapterVlan("ghost-vm", "eth0", 10)
+		if err == nil {
+			t.Fatal("SetVMNetworkAdapterVlan: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMNetworkAdapterVlan: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
 func TestSetVMDvdDrive(t *testing.T) {
 	t.Run("VM exists and empty imagePath uses $null in command", func(t *testing.T) {
 		var capturedCmd string

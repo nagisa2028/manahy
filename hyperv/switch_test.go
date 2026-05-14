@@ -70,6 +70,59 @@ func TestCheckSwitchIntegrity(t *testing.T) {
 
 // --- PS-mocked tests ---
 
+func TestGetSwitchInfo(t *testing.T) {
+	t.Run("switch exists returns info string", func(t *testing.T) {
+		callCount := 0
+		const infoOutput = "Name             : mySwitch\nSwitchType       : External\nAllowManagementOS: True\n"
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				// IsSwitchExist -> GetSwitchType
+				return []byte("SwitchType\n----------\nExternal\n"), nil
+			}
+			return []byte(infoOutput), nil
+		})
+		result, err := GetSwitchInfo("mySwitch")
+		if err != nil {
+			t.Fatalf("GetSwitchInfo: expected nil, got %v", err)
+		}
+		if !strings.Contains(result, "mySwitch") {
+			t.Errorf("GetSwitchInfo: result %q does not contain 'mySwitch'", result)
+		}
+	})
+
+	t.Run("switch not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		_, err := GetSwitchInfo("missing")
+		if err == nil {
+			t.Fatal("GetSwitchInfo: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("GetSwitchInfo: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("outputPS error returns wrapped error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return []byte("SwitchType\n----------\nExternal\n"), nil
+			}
+			return nil, errors.New("ps error")
+		})
+		_, err := GetSwitchInfo("mySwitch")
+		if err == nil {
+			t.Fatal("GetSwitchInfo: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to get info") {
+			t.Errorf("GetSwitchInfo: error %q does not contain 'failed to get info'", err.Error())
+		}
+	})
+}
+
 func TestGetSwitchType(t *testing.T) {
 	t.Run("returns External on valid output", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
