@@ -18,7 +18,7 @@ vms:
     count: 3
     generation: 1
     memory:
-      size: 1024
+      size: 1024MB
       dynamic: false
     cpu:
       thread: 1

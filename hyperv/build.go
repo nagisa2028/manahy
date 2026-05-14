@@ -2,6 +2,7 @@ package hyperv
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -45,20 +46,24 @@ func BuildByStruct(summarize Summarize) error {
 }
 
 // RemoveByStruct removes VMs, switches, and disks defined in a Summarize config.
-func RemoveByStruct(summarize Summarize) error {
+// Partial failures are written to w; the last error encountered is returned.
+func RemoveByStruct(summarize Summarize, w io.Writer) error {
 	var lastErr error
 	for key, vm := range summarize.Vms {
 		count := vm.Count
-		if count <= 1 {
+		if count == 0 {
+			count = 1
+		}
+		if count == 1 {
 			if err := RemoveVM(key, false); err != nil {
-				fmt.Printf("%s\n", err)
+				_, _ = fmt.Fprintf(w, "%s\n", err)
 				lastErr = err
 			}
 			continue
 		}
 		for i := 1; i <= count; i++ {
 			if err := RemoveVM(key+strconv.Itoa(i), false); err != nil {
-				fmt.Printf("%s\n", err)
+				_, _ = fmt.Fprintf(w, "%s\n", err)
 				lastErr = err
 			}
 		}
@@ -66,7 +71,7 @@ func RemoveByStruct(summarize Summarize) error {
 	for key, network := range summarize.Networks {
 		network.Name = key
 		if err := RemoveSwitch(network.Name); err != nil {
-			fmt.Printf("%s\n", err)
+			_, _ = fmt.Fprintf(w, "%s\n", err)
 			lastErr = err
 		}
 	}
@@ -75,7 +80,7 @@ func RemoveByStruct(summarize Summarize) error {
 			continue
 		}
 		if err := RemoveDisk(disk.Path, false); err != nil {
-			fmt.Printf("%s\n", err)
+			_, _ = fmt.Fprintf(w, "%s\n", err)
 			lastErr = err
 		}
 	}

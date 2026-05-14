@@ -2,8 +2,12 @@ package hyperv
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 )
+
+//nolint:gochecknoglobals
+var reMemorySize = regexp.MustCompile(`^[0-9]+[TGM]B$`)
 
 // GetVMList returns a list of all VMs grouped by state.
 func GetVMList() (VMList, error) {
@@ -314,6 +318,9 @@ func checkVMParam(newVM VM) error {
 	if err := checkVMPath(newVM.Name, newVM.Path); err != nil {
 		return err
 	}
+	if err := checkMemorySize(newVM.Memory.Size); err != nil {
+		return err
+	}
 	if newVM.Image != "" {
 		return isFileExist(newVM.Image)
 	}
@@ -334,6 +341,13 @@ func checkVMPath(name string, path string) error {
 func checkVMProcessor(cpu CPU) error {
 	if cpu.Thread < 1 {
 		return fmt.Errorf("vcpu count must be at least 1")
+	}
+	return nil
+}
+
+func checkMemorySize(size string) error {
+	if reMemorySize.FindString(size) == "" {
+		return fmt.Errorf("invalid memory size format: %s (expected e.g. 512MB, 1GB)", size)
 	}
 	return nil
 }

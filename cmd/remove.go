@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +20,7 @@ func newRemoveCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return hyperv.RemoveByStruct(data)
+			return hyperv.RemoveByStruct(data, os.Stderr)
 		},
 	}
 }

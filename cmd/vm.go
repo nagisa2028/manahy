@@ -18,7 +18,7 @@ func newVMCmd(configFile *string) *cobra.Command {
 	cmd.AddCommand(
 		newVMListCmd(),
 		newVMStateCmd(),
-		newVMCreateCmd(),
+		newVMCreateCmd(configFile),
 		newVMRemoveCmd(),
 		newVMRenameCmd(),
 		newVMStartCmd(),
@@ -97,7 +97,7 @@ func newVMStateCmd() *cobra.Command {
 	}
 }
 
-func newVMCreateCmd() *cobra.Command {
+func newVMCreateCmd(configFile *string) *cobra.Command {
 	var vm hyperv.VM
 	var vmDisk, vmSwitch string
 	c := &cobra.Command{
@@ -107,7 +107,7 @@ func newVMCreateCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			vm.Memory.Dynamic = !vm.Memory.Dynamic
 			if vmDisk != "" {
-				vm.Disks = append(vm.Disks, vmDisk)
+				vm.Disks = append(vm.Disks, resolveDisk(loadConfig(*configFile), vmDisk))
 			}
 			if vmSwitch != "" {
 				vm.Networks = append(vm.Networks, vmSwitch)
@@ -116,14 +116,17 @@ func newVMCreateCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVarP(&vm.Name, "name", "n", "", "new vm name")
+	_ = c.MarkFlagRequired("name")
 	c.Flags().IntVarP(&vm.Generation, "generation", "g", 1, "set vm generation")
 	c.Flags().IntVarP(&vm.CPU.Thread, "vcpus", "v", 1, "set vm vcpus")
 	c.Flags().BoolVarP(&vm.CPU.Nested, "nested", "", false, "enable nested virtualization")
-	c.Flags().StringVarP(&vm.Memory.Size, "memory", "m", "", "set vm memory")
+	c.Flags().StringVarP(&vm.Memory.Size, "memory", "m", "", "set vm memory (e.g. 512MB, 1GB)")
+	_ = c.MarkFlagRequired("memory")
 	c.Flags().BoolVarP(&vm.Memory.Dynamic, "nodynamic", "", false, "disable dynamic memory")
 	c.Flags().StringVarP(&vm.Path, "path", "p", "", "new vm path")
+	_ = c.MarkFlagRequired("path")
 	c.Flags().StringVarP(&vm.Image, "image", "i", "", "image path")
-	c.Flags().StringVarP(&vmDisk, "disk", "d", "", "disk path")
+	c.Flags().StringVarP(&vmDisk, "disk", "d", "", "disk path or alias")
 	c.Flags().StringVarP(&vmSwitch, "network", "s", "", "switch name")
 	return c
 }

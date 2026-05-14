@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
 )
@@ -24,13 +25,16 @@ func displayStorageList(storageList hyperv.StorageList) {
 }
 
 // loadConfig loads a Summarize config from the given path.
-// Returns an empty Summarize (no error) if path is empty.
+// Returns an empty Summarize if path is empty.
+// On read/parse error, prints a warning to stderr and returns an empty Summarize
+// so the caller can still fall back to treating the argument as a literal value.
 func loadConfig(path string) hyperv.Summarize {
 	if path == "" {
 		return hyperv.Summarize{}
 	}
 	config, err := hyperv.UnmarshalYaml(path)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not load config %s: %s\n", path, err)
 		return hyperv.Summarize{}
 	}
 	return config
