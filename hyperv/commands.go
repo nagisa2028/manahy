@@ -40,13 +40,13 @@ const (
 	cmdVMConnect     = "vmconnect"
 )
 
-// VM configuration
+// VM configuration.
 const (
 	cmdSetVMProcessor = "Set-VMProcessor"
 	cmdSetVMMemory    = "Set-VMMemory"
 )
 
-// VM info / metrics
+// VM info / metrics.
 const (
 	cmdGetVMProcessor              = "Get-VMProcessor"
 	cmdGetVMMemory                 = "Get-VMMemory"
@@ -58,7 +58,7 @@ const (
 	cmdGetVMHost                   = "Get-VMHost"
 )
 
-// Network adapter
+// Network adapter.
 const (
 	cmdGetVMNetworkAdapter     = "Get-VMNetworkAdapter"
 	cmdAddVMNetworkAdapter     = "Add-VMNetworkAdapter"
@@ -66,14 +66,14 @@ const (
 	cmdConnectVMNetworkAdapter = "Connect-VMNetworkAdapter"
 )
 
-// Hard disk drive
+// Hard disk drive.
 const (
 	cmdGetVMHardDiskDrive    = "Get-VMHardDiskDrive"
 	cmdAddVMHardDiskDrive    = "Add-VMHardDiskDrive"
 	cmdRemoveVMHardDiskDrive = "Remove-VMHardDiskDrive"
 )
 
-// DVD drive
+// DVD drive.
 const (
 	cmdGetVMDvdDrive    = "Get-VMDvdDrive"
 	cmdAddVMDvdDrive    = "Add-VMDvdDrive"
@@ -81,7 +81,7 @@ const (
 	cmdSetVMDvdDrive    = "Set-VMDvdDrive"
 )
 
-// Virtual switch
+// Virtual switch.
 const (
 	cmdGetVMSwitch    = "Get-VMSwitch"
 	cmdNewVMSwitch    = "New-VMSwitch"
@@ -90,7 +90,7 @@ const (
 	cmdSetVMSwitch    = "Set-VMSwitch"
 )
 
-// Checkpoint
+// Checkpoint.
 const (
 	cmdCheckpointVM        = "Checkpoint-VM"
 	cmdGetVMCheckpoint     = "Get-VMCheckpoint"
@@ -100,12 +100,12 @@ const (
 	cmdExportVMCheckpoint  = "Export-VMCheckpoint"
 )
 
-// Storage
+// Storage.
 const (
 	cmdGetDisk = "Get-Disk"
 )
 
-// Authority
+// Authority.
 const (
 	cmdGetLocalGroupMember    = "Get-LocalGroupMember"
 	cmdAddLocalGroupMember    = "Add-LocalGroupMember"

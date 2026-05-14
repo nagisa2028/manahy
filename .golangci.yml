@@ -8,6 +8,11 @@ linters:
     - gocritic
     - gochecknoglobals
     - nilerr
+    - godot
+    - copyloopvar
+    - intrange
+    - errorlint
+    - goconst
 
 linters-settings:
   revive:
