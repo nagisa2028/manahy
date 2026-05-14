@@ -16,13 +16,13 @@ manahy is a management tool for Hyper-V, operated from the command line.
 
 ### Character encoding (non-ASCII environments)
 
-If PowerShell output appears garbled (e.g. Japanese locale), run the bundled script once per console session to switch the code page to UTF-8:
+If PowerShell output appears garbled (e.g. Japanese locale), run the following command once per console session to switch the code page to UTF-8:
 
 ```
-> .\configCharCode.bat
+> chcp 65001
 ```
 
-This executes `chcp 65001` internally. Alternatively, set it permanently via Windows regional settings or add it to your PowerShell profile.
+To make this permanent, add it to your PowerShell profile (`$PROFILE`) or change the system locale to Unicode via Windows regional settings.
 
 ## Environment check
 
