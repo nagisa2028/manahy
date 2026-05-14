@@ -7,24 +7,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var hostCmd = &cobra.Command{
-	Use:   "host",
-	Short: "show Hyper-V host information",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		return fmt.Errorf("need valid command")
-	},
+func newHostCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "host",
+		Short: "show Hyper-V host information",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need valid command")
+		},
+	}
+	cmd.AddCommand(newHostShowCmd())
+	return cmd
 }
 
-var hostShow = &cobra.Command{
-	Use:   "show",
-	Short: "show Hyper-V host configuration",
-	Args:  cobra.RangeArgs(0, 0),
-	RunE: func(_ *cobra.Command, _ []string) error {
-		out, err := hyperv.GetVMHost()
-		if err != nil {
-			return err
-		}
-		fmt.Print(out)
-		return nil
-	},
+func newHostShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "show Hyper-V host configuration",
+		Args:  cobra.RangeArgs(0, 0),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			out, err := hyperv.GetVMHost()
+			if err != nil {
+				return err
+			}
+			fmt.Print(out)
+			return nil
+		},
+	}
 }

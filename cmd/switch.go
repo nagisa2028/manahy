@@ -7,99 +7,152 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var switchCmd = &cobra.Command{
-	Use:   "switch",
-	Short: "management switch on Hyper-V",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		return fmt.Errorf("need valid command")
-	},
+func newSwitchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "switch",
+		Short: "management switch on Hyper-V",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need valid command")
+		},
+	}
+	cmd.AddCommand(
+		newSwitchListCmd(),
+		newSwitchCreateCmd(),
+		newSwitchRemoveCmd(),
+		newSwitchRenameCmd(),
+		newSwitchConfigureCmd(),
+	)
+	return cmd
 }
 
-var switchList = &cobra.Command{
-	Use:   "list",
-	Short: "Print switch list",
-	Args:  cobra.RangeArgs(0, 0),
-	RunE: func(_ *cobra.Command, _ []string) error {
-		if switchListOption.external || switchListOption.internal || switchListOption.private {
-			switchListOption.all = false
-		}
-
-		switchList, err := hyperv.GetSwitchList()
-		if err != nil {
-			return err
-		}
-
-		if switchListOption.external || switchListOption.all {
-			displayList(switchList.External, "External Switch's")
-		}
-		if switchListOption.internal || switchListOption.all {
-			displayList(switchList.Internal, "Internal Switch's")
-		}
-		if switchListOption.private || switchListOption.all {
-			displayList(switchList.Private, "Private Switch's")
-		}
-		return nil
-	},
+func newSwitchListCmd() *cobra.Command {
+	opts := struct {
+		external bool
+		internal bool
+		private  bool
+		all      bool
+	}{all: true}
+	c := &cobra.Command{
+		Use:   "list",
+		Short: "Print switch list",
+		Args:  cobra.RangeArgs(0, 0),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if opts.external || opts.internal || opts.private {
+				opts.all = false
+			}
+			switchList, err := hyperv.GetSwitchList()
+			if err != nil {
+				return err
+			}
+			if opts.external || opts.all {
+				displayList(switchList.External, "External Switch's")
+			}
+			if opts.internal || opts.all {
+				displayList(switchList.Internal, "Internal Switch's")
+			}
+			if opts.private || opts.all {
+				displayList(switchList.Private, "Private Switch's")
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVarP(&opts.external, "external", "e", false, "list external switches")
+	c.Flags().BoolVarP(&opts.internal, "internal", "i", false, "list internal switches")
+	c.Flags().BoolVarP(&opts.private, "private", "p", false, "list private switches")
+	c.Flags().BoolVarP(&opts.all, "all", "a", true, "list all switches")
+	return c
 }
 
-var switchCreate = &cobra.Command{
-	Use:   "create",
-	Short: "Create switch",
-	Args:  cobra.RangeArgs(0, 0),
-	RunE: func(_ *cobra.Command, _ []string) error {
-		if switchCreateOption.Name == "" || switchCreateOption.Type == "" {
-			return fmt.Errorf("--name and --type are required")
-		}
-		if switchCreateOption.Type == "external" && switchCreateOption.ExternalInterface == "" {
-			return fmt.Errorf("--external-interface is required for external switches")
-		}
-		return hyperv.CreateSwitch(switchCreateOption, true)
-	},
+func newSwitchCreateCmd() *cobra.Command {
+	var opt hyperv.VMSwitch
+	c := &cobra.Command{
+		Use:   "create",
+		Short: "Create switch",
+		Args:  cobra.RangeArgs(0, 0),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if opt.Name == "" || opt.Type == "" {
+				return fmt.Errorf("--name and --type are required")
+			}
+			if opt.Type == "external" && opt.ExternalInterface == "" {
+				return fmt.Errorf("--external-interface is required for external switches")
+			}
+			return hyperv.CreateSwitch(opt, true)
+		},
+	}
+	c.Flags().StringVarP(&opt.Name, "name", "n", "", "set name")
+	c.Flags().StringVarP(&opt.Type, "type", "t", "", "set type")
+	c.Flags().StringVarP(&opt.ExternalInterface, "external-interface", "", "", "set external interface")
+	c.Flags().BoolVarP(&opt.AllowManagementOs, "allow-management-os", "", false, "set allow management os")
+	return c
 }
 
-var switchRemove = &cobra.Command{
-	Use:   "remove",
-	Short: "Remove switch",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		return hyperv.RemoveSwitch(args[0])
-	},
+func newSwitchRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove",
+		Short: "Remove switch",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.RemoveSwitch(args[0])
+		},
+	}
 }
 
-var switchRename = &cobra.Command{
-	Use:   "rename",
-	Short: "Rename switch",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		if newSwitchName == "" {
-			return fmt.Errorf("--new-name is required")
-		}
-		return hyperv.RenameSwitch(args[0], newSwitchName)
-	},
+func newSwitchRenameCmd() *cobra.Command {
+	var newName string
+	c := &cobra.Command{
+		Use:   "rename",
+		Short: "Rename switch",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if newName == "" {
+				return fmt.Errorf("--new-name is required")
+			}
+			return hyperv.RenameSwitch(args[0], newName)
+		},
+	}
+	c.Flags().StringVarP(&newName, "new-name", "n", "", "rename switch")
+	return c
 }
 
-var switchOptionCfgCmd = &cobra.Command{
-	Use:   "configure",
-	Short: "Configure switch option",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		return fmt.Errorf("need valid command")
-	},
+func newSwitchConfigureCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "configure",
+		Short: "Configure switch option",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need valid command")
+		},
+	}
+	cmd.AddCommand(
+		newSwitchConfigureTypeCmd(),
+		newSwitchConfigureAdapterCmd(),
+	)
+	return cmd
 }
 
-var switchOptionCfgType = &cobra.Command{
-	Use:   "type",
-	Short: "Configure switch type",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		return hyperv.ChangeSwitchType(args[0], switchType)
-	},
+func newSwitchConfigureTypeCmd() *cobra.Command {
+	var switchType string
+	c := &cobra.Command{
+		Use:   "type",
+		Short: "Configure switch type",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.ChangeSwitchType(args[0], switchType)
+		},
+	}
+	c.Flags().StringVarP(&switchType, "type", "t", "", "change switch type")
+	return c
 }
 
-var switchOptionCfgNetAdapter = &cobra.Command{
-	Use:   "adapter",
-	Short: "Configure network adapter",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		return hyperv.ChangeSwitchNetAdapter(args[0], netAdapter)
-	},
+func newSwitchConfigureAdapterCmd() *cobra.Command {
+	var netAdapter string
+	c := &cobra.Command{
+		Use:   "adapter",
+		Short: "Configure network adapter",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.ChangeSwitchNetAdapter(args[0], netAdapter)
+		},
+	}
+	c.Flags().StringVarP(&netAdapter, "net-adapter", "n", "", "change network adapter")
+	return c
 }

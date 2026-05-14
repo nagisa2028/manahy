@@ -7,87 +7,127 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var checkpointCmd = &cobra.Command{
-	Use:   "checkpoint",
-	Short: "manage VM checkpoints",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		return fmt.Errorf("need valid command")
-	},
+func newCheckpointCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "checkpoint",
+		Short: "manage VM checkpoints",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need valid command")
+		},
+	}
+	cmd.AddCommand(
+		newCheckpointCreateCmd(),
+		newCheckpointListCmd(),
+		newCheckpointRestoreCmd(),
+		newCheckpointRemoveCmd(),
+		newCheckpointRenameCmd(),
+		newCheckpointExportCmd(),
+	)
+	return cmd
 }
 
-var checkpointCreate = &cobra.Command{
-	Use:   "create",
-	Short: "create a checkpoint for a VM",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		return hyperv.CreateCheckpoint(args[0], checkpointName)
-	},
+func newCheckpointCreateCmd() *cobra.Command {
+	var name string
+	c := &cobra.Command{
+		Use:   "create",
+		Short: "create a checkpoint for a VM",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.CreateCheckpoint(args[0], name)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	return c
 }
 
-var checkpointList = &cobra.Command{
-	Use:   "list",
-	Short: "list checkpoints for a VM",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		out, err := hyperv.GetCheckpoints(args[0])
-		if err != nil {
-			return err
-		}
-		fmt.Print(out)
-		return nil
-	},
+func newCheckpointListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "list checkpoints for a VM",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			out, err := hyperv.GetCheckpoints(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Print(out)
+			return nil
+		},
+	}
 }
 
-var checkpointRestore = &cobra.Command{
-	Use:   "restore",
-	Short: "restore a VM to a checkpoint",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		if checkpointName == "" {
-			return fmt.Errorf("--name is required")
-		}
-		return hyperv.RestoreCheckpoint(args[0], checkpointName)
-	},
+func newCheckpointRestoreCmd() *cobra.Command {
+	var name string
+	c := &cobra.Command{
+		Use:   "restore",
+		Short: "restore a VM to a checkpoint",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			return hyperv.RestoreCheckpoint(args[0], name)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	return c
 }
 
-var checkpointRemove = &cobra.Command{
-	Use:   "remove",
-	Short: "delete a checkpoint from a VM",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		if checkpointName == "" {
-			return fmt.Errorf("--name is required")
-		}
-		return hyperv.RemoveCheckpoint(args[0], checkpointName)
-	},
+func newCheckpointRemoveCmd() *cobra.Command {
+	var name string
+	c := &cobra.Command{
+		Use:   "remove",
+		Short: "delete a checkpoint from a VM",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			return hyperv.RemoveCheckpoint(args[0], name)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	return c
 }
 
-var checkpointRename = &cobra.Command{
-	Use:   "rename",
-	Short: "rename a checkpoint",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		if checkpointName == "" {
-			return fmt.Errorf("--name is required")
-		}
-		if newCheckpointName == "" {
-			return fmt.Errorf("--new-name is required")
-		}
-		return hyperv.RenameCheckpoint(args[0], checkpointName, newCheckpointName)
-	},
+func newCheckpointRenameCmd() *cobra.Command {
+	var name, newName string
+	c := &cobra.Command{
+		Use:   "rename",
+		Short: "rename a checkpoint",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			if newName == "" {
+				return fmt.Errorf("--new-name is required")
+			}
+			return hyperv.RenameCheckpoint(args[0], name, newName)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	c.Flags().StringVarP(&newName, "new-name", "", "", "new checkpoint name")
+	return c
 }
 
-var checkpointExport = &cobra.Command{
-	Use:   "export",
-	Short: "export a checkpoint to a directory",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		if checkpointName == "" {
-			return fmt.Errorf("--name is required")
-		}
-		if exportPath == "" {
-			return fmt.Errorf("--path is required")
-		}
-		return hyperv.ExportCheckpoint(args[0], checkpointName, exportPath)
-	},
+func newCheckpointExportCmd() *cobra.Command {
+	var name, path string
+	c := &cobra.Command{
+		Use:   "export",
+		Short: "export a checkpoint to a directory",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			if path == "" {
+				return fmt.Errorf("--path is required")
+			}
+			return hyperv.ExportCheckpoint(args[0], name, path)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	c.Flags().StringVarP(&path, "path", "p", "", "export destination directory")
+	return c
 }

@@ -7,11 +7,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// RootCmd is the top-level manahy command.
-var RootCmd = &cobra.Command{
-	Use:   "manahy",
-	Short: "manahy is management tool on Hyper-V",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		return fmt.Errorf("need valid command")
-	},
+// Execute runs the root command.
+func Execute() error {
+	return newRootCmd().Execute()
+}
+
+func newRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "manahy",
+		Short: "manahy is management tool on Hyper-V",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need valid command")
+		},
+	}
+	cmd.AddCommand(
+		newVersionCmd(),
+		newVMCmd(),
+		newSwitchCmd(),
+		newDiskCmd(),
+		newStorageCmd(),
+		newMemberCmd(),
+		newCheckpointCmd(),
+		newHostCmd(),
+		newBuildCmd(),
+		newRemoveCmd(),
+	)
+	return cmd
 }
