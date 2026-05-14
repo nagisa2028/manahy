@@ -17,6 +17,7 @@ func newHostCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newHostShowCmd(),
+		newHostCheckCmd(),
 		newMemberCmd(),
 		newStorageCmd(),
 	)
