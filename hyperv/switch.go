@@ -102,7 +102,7 @@ func ChangeSwitchType(name string, switchType string) error {
 	case "Unknown":
 		return fmt.Errorf("failed to get state of switch %s", name)
 	}
-	if err := checkSwitchTypeParam(switchType); err != nil {
+	if err := checkSwitchType(switchType); err != nil {
 		return err
 	}
 	if nameType == switchType {
@@ -126,13 +126,13 @@ func checkSwitchParam(newSwitch VMSwitch) error {
 	if GetSwitchType(newSwitch.Name) != "NotFound" {
 		return fmt.Errorf("switch %s already exists", newSwitch.Name)
 	}
-	if err := checkSwitchTypeParam(newSwitch.Type); err != nil {
+	if err := checkSwitchType(newSwitch.Type); err != nil {
 		return err
 	}
-	return checkSwitchParamIntegrity(newSwitch.Type, newSwitch.ExternalInterface)
+	return checkSwitchIntegrity(newSwitch.Type, newSwitch.ExternalInterface)
 }
 
-func checkSwitchTypeParam(switchType string) error {
+func checkSwitchType(switchType string) error {
 	switch switchType {
 	case "external", "internal", "private":
 		return nil
@@ -141,12 +141,12 @@ func checkSwitchTypeParam(switchType string) error {
 	}
 }
 
-func checkSwitchParamIntegrity(switchType string, externalInterface string) error {
+func checkSwitchIntegrity(switchType string, externalInterface string) error {
 	if switchType == "external" && externalInterface == "" {
-		return fmt.Errorf("--external-interface is required for external switches")
+		return fmt.Errorf("external interface is required for external switches")
 	}
 	if switchType != "external" && externalInterface != "" {
-		return fmt.Errorf("--external-interface is only valid for external switches")
+		return fmt.Errorf("external interface is only valid for external switches")
 	}
 	return nil
 }

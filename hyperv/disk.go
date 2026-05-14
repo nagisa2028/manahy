@@ -55,7 +55,7 @@ func checkDiskParam(newDisk Disk) error {
 	if err := isNotFileExist(newDisk.Path); err != nil {
 		return err
 	}
-	if err := checkDiskTypeParam(newDisk.Type); err != nil {
+	if err := checkDiskType(newDisk.Type); err != nil {
 		return err
 	}
 	if newDisk.Type == "differencing" {
@@ -63,10 +63,10 @@ func checkDiskParam(newDisk Disk) error {
 			return err
 		}
 	}
-	return checkDiskSizeParam(newDisk.Size)
+	return checkDiskSize(newDisk.Size)
 }
 
-func checkDiskTypeParam(diskType string) error {
+func checkDiskType(diskType string) error {
 	switch diskType {
 	case "dynamic", "fixed", "differencing":
 		return nil
@@ -75,7 +75,7 @@ func checkDiskTypeParam(diskType string) error {
 	}
 }
 
-func checkDiskSizeParam(diskSize string) error {
+func checkDiskSize(diskSize string) error {
 	if regexp.MustCompile("^[0-9]*[TGM]B$").FindString(diskSize) == "" {
 		return fmt.Errorf("invalid disk size format: %s (expected e.g. 10GB)", diskSize)
 	}
@@ -99,7 +99,7 @@ func ResizeVHD(path, size string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	if err := checkDiskSizeParam(size); err != nil {
+	if err := checkDiskSize(size); err != nil {
 		return err
 	}
 	return exec.Command("powershell", "-NoProfile", "Resize-VHD -Path '"+path+"' -SizeBytes "+size).Run()

@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-var newLine = "\r\n|\n"
-var spaceChar = "^[-\\s]*$"
+const reSplitLine = "\r\n|\n"
+const reBlankLine = "^[-\\s]*$"
 
 func listingOfExecuteResults(res []byte, flag string) []string {
 	var list []string
-	split := regexp.MustCompile(newLine).Split(string(res), -1)
+	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
 	for _, line := range split {
 		line = strings.Trim(line, " ")
 		if line != flag && !regexp.MustCompile("^-*$").MatchString(line) && line != "" {
@@ -24,10 +24,10 @@ func listingOfExecuteResults(res []byte, flag string) []string {
 
 func vmListingOfExecuteResults(res []byte) (VMList, error) {
 	var vmList VMList
-	split := regexp.MustCompile(newLine).Split(string(res), -1)
+	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
 	for _, line := range split {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || regexp.MustCompile(spaceChar).MatchString(line) {
+		if strings.Contains(line, "Name") || regexp.MustCompile(reBlankLine).MatchString(line) {
 			continue
 		}
 		state := regexp.MustCompile("Running$|Saved$|Off$|Paused$").FindString(line)
@@ -51,10 +51,10 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 
 func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 	var switchList SwitchList
-	split := regexp.MustCompile(newLine).Split(string(res), -1)
+	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
 	for _, line := range split {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || regexp.MustCompile(spaceChar).MatchString(line) {
+		if strings.Contains(line, "Name") || regexp.MustCompile(reBlankLine).MatchString(line) {
 			continue
 		}
 		switchType := regexp.MustCompile("External$|Internal$|Private$").FindString(line)
@@ -76,10 +76,10 @@ func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 
 func storageListingOfExecuteResults(res []byte) (StorageList, error) {
 	var storageList StorageList
-	split := regexp.MustCompile(newLine).Split(string(res), -1)
+	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
 	for _, line := range split {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Number") || regexp.MustCompile(spaceChar).MatchString(line) {
+		if strings.Contains(line, "Number") || regexp.MustCompile(reBlankLine).MatchString(line) {
 			continue
 		}
 		storageList.Number = append(storageList.Number, regexp.MustCompile("^[0-9]+").FindString(line))
@@ -117,7 +117,7 @@ func computeCapacity(raw string) (float64, string, error) {
 		case "TB":
 			unit = "PB"
 		default:
-			return 0, "", fmt.Errorf("undefined capacity unit: %s", unit)
+			return 0, "", fmt.Errorf("unknown capacity unit: %s", unit)
 		}
 	}
 	return v, unit, nil

@@ -55,7 +55,7 @@ func SetVMProcessor(name string, cpu CPU) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	if err := checkVMProcessorParam(cpu); err != nil {
+	if err := checkVMProcessor(cpu); err != nil {
 		return err
 	}
 
@@ -333,7 +333,7 @@ func checkVMPath(name string, path string) error {
 	return isNotFileExist(path + "\\" + name)
 }
 
-func checkVMProcessorParam(cpu CPU) error {
+func checkVMProcessor(cpu CPU) error {
 	if cpu.Thread < 1 {
 		return fmt.Errorf("vcpu count must be at least 1")
 	}

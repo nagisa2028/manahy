@@ -23,7 +23,7 @@ func UnmarshalYaml(name string) (Summarize, error) {
 
 func loadFile(name string) ([]byte, error) {
 	if err := isFileExist(name); err != nil {
-		return nil, fmt.Errorf("file does not exist: %s", name)
+		return nil, err
 	}
 
 	buf, err := os.ReadFile(name)
