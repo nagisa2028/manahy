@@ -59,6 +59,35 @@ func TestCheckVMProcessor(t *testing.T) {
 	}
 }
 
+func TestCheckMemorySize(t *testing.T) {
+	tests := []struct {
+		name    string
+		size    string
+		wantErr bool
+	}{
+		{"GB valid", "1GB", false},
+		{"MB valid", "512MB", false},
+		{"TB valid", "2TB", false},
+		{"multi digit", "1024MB", false},
+		{"bare number no unit", "1024", true},
+		{"KB not supported", "512KB", true},
+		{"empty string", "", true},
+		{"lowercase", "1gb", true},
+		{"with space", "1 GB", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkMemorySize(tc.size)
+			if tc.wantErr && err == nil {
+				t.Errorf("checkMemorySize(%q): expected error, got nil", tc.size)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("checkMemorySize(%q): unexpected error: %v", tc.size, err)
+			}
+		})
+	}
+}
+
 // ---------- GetVMState ----------
 
 func TestGetVMState(t *testing.T) {
