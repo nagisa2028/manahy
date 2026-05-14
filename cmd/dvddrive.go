@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newVMDvdCmd() *cobra.Command {
+func newVMDvdCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dvd",
 		Short: "manage VM DVD drives",
@@ -19,7 +19,7 @@ func newVMDvdCmd() *cobra.Command {
 		newVMDvdListCmd(),
 		newVMDvdAddCmd(),
 		newVMDvdRemoveCmd(),
-		newVMDvdSetCmd(),
+		newVMDvdSetCmd(configFile),
 		newVMDvdEjectCmd(),
 	)
 	return cmd
@@ -63,20 +63,19 @@ func newVMDvdRemoveCmd() *cobra.Command {
 	}
 }
 
-func newVMDvdSetCmd() *cobra.Command {
-	var image string
+func newVMDvdSetCmd(configFile *string) *cobra.Command {
+	var imageAlias string
 	c := &cobra.Command{
 		Use:   "set",
 		Short: "set the ISO image for the DVD drive",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if image == "" {
-				return fmt.Errorf("--image is required")
-			}
+			image := resolveDisk(loadConfig(*configFile), imageAlias)
 			return hyperv.SetVMDvdDrive(args[0], image)
 		},
 	}
-	c.Flags().StringVarP(&image, "image", "i", "", "ISO image path")
+	c.Flags().StringVarP(&imageAlias, "image", "i", "", "ISO image path or disk alias")
+	_ = c.MarkFlagRequired("image")
 	return c
 }
 

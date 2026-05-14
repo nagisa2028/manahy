@@ -13,6 +13,7 @@ func Execute() error {
 }
 
 func newRootCmd() *cobra.Command {
+	var configFile string
 	cmd := &cobra.Command{
 		Use:   "manahy",
 		Short: "manahy is management tool on Hyper-V",
@@ -20,17 +21,18 @@ func newRootCmd() *cobra.Command {
 			return fmt.Errorf("need valid command")
 		},
 	}
+	cmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file path")
 	cmd.AddCommand(
 		newVersionCmd(),
-		newVMCmd(),
+		newVMCmd(&configFile),
 		newSwitchCmd(),
-		newDiskCmd(),
+		newDiskCmd(&configFile),
 		newStorageCmd(),
 		newMemberCmd(),
 		newCheckpointCmd(),
 		newHostCmd(),
-		newBuildCmd(),
-		newRemoveCmd(),
+		newBuildCmd(&configFile),
+		newRemoveCmd(&configFile),
 	)
 	return cmd
 }

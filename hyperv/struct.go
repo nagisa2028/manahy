@@ -3,15 +3,15 @@ package hyperv
 
 // VM is create vm option.
 type VM struct {
-	Name       string   `yaml:"name" json:"name"`
+	Name       string   `yaml:"-"`
 	Count      int      `yaml:"count,omitempty"`
-	Generation int      `yaml:"generation" json:"generation"`
-	CPU        CPU      `yaml:"cpu" json:"cpu"`
-	Memory     Memory   `yaml:"memory" json:"memory"`
-	Path       string   `yaml:"path" json:"path"`
-	Image      string   `yaml:"image,omitempty" json:"image"`
-	Disks      []string `yaml:"disk"`
-	Networks   []string `yaml:"network"`
+	Generation int      `yaml:"generation"`
+	CPU        CPU      `yaml:"cpu"`
+	Memory     Memory   `yaml:"memory"`
+	Path       string   `yaml:"path"`
+	Image      string   `yaml:"image,omitempty"`
+	Disks      []string `yaml:"disks"`
+	Networks   []string `yaml:"networks"`
 }
 
 // CPU is set-processor option.
@@ -38,7 +38,7 @@ type Disk struct {
 
 // VMSwitch is create switch option.
 type VMSwitch struct {
-	Name              string `yaml:"name"`
+	Name              string `yaml:"-"`
 	Type              string `yaml:"type"`
 	ExternalInterface string `yaml:"external-interface,omitempty"`
 	AllowManagementOS bool   `yaml:"allow-management-os,omitempty"`

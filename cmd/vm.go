@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newVMCmd() *cobra.Command {
+func newVMCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vm",
 		Short: "management vm on Hyper-V",
@@ -37,8 +37,8 @@ func newVMCmd() *cobra.Command {
 		newVMMeasureCmd(),
 		newVMIntegrationCmd(),
 		newVMNicCmd(),
-		newVMHardDiskCmd(),
-		newVMDvdCmd(),
+		newVMHardDiskCmd(configFile),
+		newVMDvdCmd(configFile),
 	)
 	return cmd
 }

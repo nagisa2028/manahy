@@ -1,6 +1,20 @@
+disks:
+  test-disk:
+    path: test.vhd
+    size: 10GB
+    type: dynamic
+  imported-disk:
+    path: test2.vhd
+    import: true
+
+networks:
+  ex1:
+    type: private
+  internal:
+    type: internal
+
 vms:
-  testVM:
-    name: test
+  test:
     count: 3
     generation: 1
     memory:
@@ -11,23 +25,8 @@ vms:
       nested: true
     path: C:\test
     image: C:\Users\naoki\Downloads\vyos-1.4-rolling-202207070217-amd64.iso
-    disk: 
-    - test.vhd
-    network:
-    - ex1
-    - internal
-disks:
-  disk1:
-    size: 10GB
-    type: dynamic
-    path: test.vhd
-  testDisk:
-    import: true
-    path: test2.vhd
-networks:
-  sw1:
-    name: ex1
-    type: private
-  testSW:
-    name: internal
-    type: internal
+    disks:
+      - test-disk
+    networks:
+      - ex1
+      - internal

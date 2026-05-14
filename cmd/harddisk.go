@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newVMHardDiskCmd() *cobra.Command {
+func newVMHardDiskCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "disk",
 		Short: "manage VM hard disk drives",
@@ -17,8 +17,8 @@ func newVMHardDiskCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newVMHardDiskListCmd(),
-		newVMHardDiskAddCmd(),
-		newVMHardDiskRemoveCmd(),
+		newVMHardDiskAddCmd(configFile),
+		newVMHardDiskRemoveCmd(configFile),
 	)
 	return cmd
 }
@@ -39,36 +39,34 @@ func newVMHardDiskListCmd() *cobra.Command {
 	}
 }
 
-func newVMHardDiskAddCmd() *cobra.Command {
-	var path string
+func newVMHardDiskAddCmd(configFile *string) *cobra.Command {
+	var diskAlias string
 	c := &cobra.Command{
 		Use:   "add",
 		Short: "attach a VHD to a VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
+			path := resolveDisk(loadConfig(*configFile), diskAlias)
 			return hyperv.AddVMHardDiskDrive(args[0], path)
 		},
 	}
-	c.Flags().StringVarP(&path, "path", "p", "", "VHD path")
+	c.Flags().StringVarP(&diskAlias, "path", "p", "", "VHD path or disk alias")
+	_ = c.MarkFlagRequired("path")
 	return c
 }
 
-func newVMHardDiskRemoveCmd() *cobra.Command {
-	var path string
+func newVMHardDiskRemoveCmd(configFile *string) *cobra.Command {
+	var diskAlias string
 	c := &cobra.Command{
 		Use:   "remove",
 		Short: "detach a VHD from a VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
+			path := resolveDisk(loadConfig(*configFile), diskAlias)
 			return hyperv.RemoveVMHardDiskDrive(args[0], path)
 		},
 	}
-	c.Flags().StringVarP(&path, "path", "p", "", "VHD path")
+	c.Flags().StringVarP(&diskAlias, "path", "p", "", "VHD path or disk alias")
+	_ = c.MarkFlagRequired("path")
 	return c
 }

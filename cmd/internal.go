@@ -22,3 +22,25 @@ func displayStorageList(storageList hyperv.StorageList) {
 	fmt.Print("\n")
 	fmt.Print("More information, execute 'Get-Disk'\n")
 }
+
+// loadConfig loads a Summarize config from the given path.
+// Returns an empty Summarize (no error) if path is empty.
+func loadConfig(path string) hyperv.Summarize {
+	if path == "" {
+		return hyperv.Summarize{}
+	}
+	config, err := hyperv.UnmarshalYaml(path)
+	if err != nil {
+		return hyperv.Summarize{}
+	}
+	return config
+}
+
+// resolveDisk resolves a disk alias to a path using the loaded config.
+// If the arg matches a key in config.Disks, returns its path; otherwise returns arg as-is.
+func resolveDisk(config hyperv.Summarize, arg string) string {
+	if d, ok := config.Disks[arg]; ok {
+		return d.Path
+	}
+	return arg
+}

@@ -5,12 +5,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newBuildCmd() *cobra.Command {
+func newBuildCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "build",
-		Short: "create vm, disk and switch from manahy.yaml",
+		Short: "create vm, disk and switch from config file",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			data, err := hyperv.UnmarshalYaml("manahy.yaml")
+			path := *configFile
+			if path == "" {
+				path = "manahy.yaml"
+			}
+			data, err := hyperv.UnmarshalYaml(path)
 			if err != nil {
 				return err
 			}

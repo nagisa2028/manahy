@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newDiskCmd() *cobra.Command {
+func newDiskCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "disk",
 		Short: "management virtual disk",
@@ -17,14 +17,14 @@ func newDiskCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newDiskCreateCmd(),
-		newDiskRemoveCmd(),
-		newDiskInfoCmd(),
-		newDiskResizeCmd(),
-		newDiskOptimizeCmd(),
-		newDiskConvertCmd(),
-		newDiskMountCmd(),
-		newDiskDismountCmd(),
-		newDiskMergeCmd(),
+		newDiskRemoveCmd(configFile),
+		newDiskInfoCmd(configFile),
+		newDiskResizeCmd(configFile),
+		newDiskOptimizeCmd(configFile),
+		newDiskConvertCmd(configFile),
+		newDiskMountCmd(configFile),
+		newDiskDismountCmd(configFile),
+		newDiskMergeCmd(configFile),
 	)
 	return cmd
 }
@@ -47,24 +47,26 @@ func newDiskCreateCmd() *cobra.Command {
 	return c
 }
 
-func newDiskRemoveCmd() *cobra.Command {
+func newDiskRemoveCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove",
 		Short: "remove a virtual disk",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.RemoveDisk(args[0], true)
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.RemoveDisk(path, true)
 		},
 	}
 }
 
-func newDiskInfoCmd() *cobra.Command {
+func newDiskInfoCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "info",
 		Short: "show VHD info",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			out, err := hyperv.GetVHDInfo(args[0])
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			out, err := hyperv.GetVHDInfo(path)
 			if err != nil {
 				return err
 			}
@@ -74,14 +76,15 @@ func newDiskInfoCmd() *cobra.Command {
 	}
 }
 
-func newDiskResizeCmd() *cobra.Command {
+func newDiskResizeCmd(configFile *string) *cobra.Command {
 	var size string
 	c := &cobra.Command{
 		Use:   "resize",
 		Short: "resize a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.ResizeVHD(args[0], size)
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.ResizeVHD(path, size)
 		},
 	}
 	c.Flags().StringVarP(&size, "size", "s", "", "new size (e.g. 20GB)")
@@ -89,25 +92,27 @@ func newDiskResizeCmd() *cobra.Command {
 	return c
 }
 
-func newDiskOptimizeCmd() *cobra.Command {
+func newDiskOptimizeCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "optimize",
 		Short: "optimize a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.OptimizeVHD(args[0])
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.OptimizeVHD(path)
 		},
 	}
 }
 
-func newDiskConvertCmd() *cobra.Command {
+func newDiskConvertCmd(configFile *string) *cobra.Command {
 	var dest, diskType string
 	c := &cobra.Command{
 		Use:   "convert",
 		Short: "convert a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.ConvertVHD(args[0], dest, diskType)
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.ConvertVHD(path, dest, diskType)
 		},
 	}
 	c.Flags().StringVarP(&dest, "dest", "d", "", "destination path")
@@ -116,36 +121,39 @@ func newDiskConvertCmd() *cobra.Command {
 	return c
 }
 
-func newDiskMountCmd() *cobra.Command {
+func newDiskMountCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "mount",
 		Short: "mount a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.MountVHD(args[0])
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.MountVHD(path)
 		},
 	}
 }
 
-func newDiskDismountCmd() *cobra.Command {
+func newDiskDismountCmd(configFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "dismount",
 		Short: "dismount a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.DismountVHD(args[0])
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.DismountVHD(path)
 		},
 	}
 }
 
-func newDiskMergeCmd() *cobra.Command {
+func newDiskMergeCmd(configFile *string) *cobra.Command {
 	var dest string
 	c := &cobra.Command{
 		Use:   "merge",
 		Short: "merge a VHD into its parent",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.MergeVHD(args[0], dest)
+			path := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.MergeVHD(path, dest)
 		},
 	}
 	c.Flags().StringVarP(&dest, "dest", "d", "", "destination path (default: merge into parent)")
