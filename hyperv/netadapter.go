@@ -45,9 +45,15 @@ func ConnectVMNetworkAdapter(vmName, name, switchName string) error {
 	return runPS(cmdConnectVMNetworkAdapter + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -SwitchName " + ps(switchName))
 }
 
+// maxVlanID is the highest valid IEEE 802.1Q VLAN identifier.
+const maxVlanID = 4094
+
 // SetVMNetworkAdapterVlan assigns an access VLAN ID to a VM network adapter.
 // Pass vlanID=0 to remove VLAN tagging (untagged mode).
 func SetVMNetworkAdapterVlan(vmName, name string, vlanID int) error {
+	if vlanID < 0 || vlanID > maxVlanID {
+		return fmt.Errorf("VLAN ID must be between 0 and %d, got %d", maxVlanID, vlanID)
+	}
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}

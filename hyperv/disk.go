@@ -6,8 +6,11 @@ import (
 	"strconv"
 )
 
+// maxDiskSizeGB is the upper bound for disk and memory size validation (64 TB).
+const maxDiskSizeGB = 64 * 1024
+
 //nolint:gochecknoglobals
-var reDiskSize = regexp.MustCompile("^[0-9]*[TGM]B$")
+var reDiskSize = regexp.MustCompile(`^([0-9]+)[TGM]B$`)
 
 // CreateDisk creates a new virtual hard disk.
 func CreateDisk(newDisk Disk, output bool) error {
@@ -78,8 +81,21 @@ func checkDiskType(diskType string) error {
 }
 
 func checkDiskSize(diskSize string) error {
-	if reDiskSize.FindString(diskSize) == "" {
+	m := reDiskSize.FindStringSubmatch(diskSize)
+	if m == nil {
 		return fmt.Errorf("invalid disk size format: %s (expected e.g. 10GB)", diskSize)
+	}
+	n, _ := strconv.Atoi(m[1])
+	unit := diskSize[len(m[1]):]
+	sizeGB := n
+	switch unit {
+	case "TB":
+		sizeGB = n * 1024
+	case "MB":
+		sizeGB = 0 // MB values are always well under the cap
+	}
+	if sizeGB > maxDiskSizeGB {
+		return fmt.Errorf("disk size %s exceeds maximum allowed size of %dTB", diskSize, maxDiskSizeGB/1024)
 	}
 	return nil
 }

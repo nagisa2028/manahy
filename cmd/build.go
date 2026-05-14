@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
@@ -21,6 +22,7 @@ func newBuildCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			fmt.Fprintf(os.Stderr, "using config: %s\n", path)
 			if dryRun {
 				hyperv.DryRunBuild(data, os.Stdout)
 				return nil

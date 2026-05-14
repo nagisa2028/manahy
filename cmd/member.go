@@ -43,11 +43,16 @@ func newMemberListCmd() *cobra.Command {
 }
 
 func newMemberAddCmd() *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	c := &cobra.Command{
 		Use:   "add",
 		Short: "add a user to Hyper-V Administrators",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
+			prompt := fmt.Sprintf("Add %d user(s) to Hyper-V Administrators?", len(args))
+			if !confirmAction(prompt, force) {
+				return nil
+			}
 			for _, name := range args {
 				if err := hyperv.AddGroupMember(name); err != nil {
 					return err
@@ -56,14 +61,21 @@ func newMemberAddCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return c
 }
 
 func newMemberRemoveCmd() *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	c := &cobra.Command{
 		Use:   "remove",
 		Short: "remove a user from Hyper-V Administrators",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
+			prompt := fmt.Sprintf("Remove %d user(s) from Hyper-V Administrators?", len(args))
+			if !confirmAction(prompt, force) {
+				return nil
+			}
 			for _, name := range args {
 				if err := hyperv.RemoveGroupMember(name); err != nil {
 					return err
@@ -72,4 +84,6 @@ func newMemberRemoveCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return c
 }

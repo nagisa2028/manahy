@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Hyper-V supports only generation 1 and 2.
@@ -11,6 +12,8 @@ const (
 	minVMGeneration     = 1
 	maxVMGeneration     = 2
 	minVMProcessorCount = 1
+	maxVMCount          = 256
+	maxMemorySizeGB     = 16 * 1024 // 16 TB upper bound for memory size validation
 )
 
 //nolint:gochecknoglobals
@@ -319,6 +322,10 @@ func CopyVM(name, newName, destPath string) error {
 	if err := IsNotVMExist(newName); err != nil {
 		return err
 	}
+	// Guard against backslashes in VM names breaking the intermediate path construction.
+	if strings.ContainsAny(name, `\/`) {
+		return fmt.Errorf("VM name %q must not contain path separators", name)
+	}
 	script := cmdExportVM + " -Name " + ps(name) + " -Path " + ps(destPath) + "; " +
 		"$vmcx = (Get-ChildItem -Recurse -Path " + ps(destPath+"\\"+name) + " -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
 		"$newVM = " + cmdImportVM + " -Path $vmcx -Copy -GenerateNewId; " +
@@ -366,6 +373,15 @@ func checkVMProcessor(cpu CPU) error {
 func checkMemorySize(size string) error {
 	if reMemorySize.FindString(size) == "" {
 		return fmt.Errorf("invalid memory size format: %s (expected e.g. 512MB, 1GB)", size)
+	}
+	n, _ := strconv.Atoi(size[:len(size)-2])
+	unit := size[len(size)-2:]
+	sizeGB := n
+	if unit == "TB" {
+		sizeGB = n * 1024
+	}
+	if sizeGB > maxMemorySizeGB {
+		return fmt.Errorf("memory size %s exceeds maximum allowed size of %dTB", size, maxMemorySizeGB/1024)
 	}
 	return nil
 }

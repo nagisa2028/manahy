@@ -36,6 +36,9 @@ func BuildByStruct(summarize Summarize) error {
 		if vm.Count == 0 {
 			vm.Count = 1
 		}
+		if vm.Count > maxVMCount {
+			return fmt.Errorf("vm %s: count %d exceeds maximum of %d", key, vm.Count, maxVMCount)
+		}
 		for i := 1; i <= vm.Count; i++ {
 			named := vm
 			if vm.Count != 1 {

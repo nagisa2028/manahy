@@ -121,7 +121,7 @@ func ChangeSwitchType(name string, switchType string) error {
 	if strings.EqualFold(nameType, switchType) {
 		return fmt.Errorf("switch %s is already of type %s", name, switchType)
 	}
-	return runPS(cmdSetVMSwitch + " " + ps(name) + " -SwitchType " + switchType)
+	return runPS(cmdSetVMSwitch + " " + ps(name) + " -SwitchType " + ps(switchType))
 }
 
 // ChangeSwitchNetAdapter changes the net adapter of an external virtual switch.

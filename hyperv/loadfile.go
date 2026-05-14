@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2" //nolint:depguard
 )
 
 // UnmarshalYaml reads and parses a manahy YAML configuration file.
@@ -22,13 +22,9 @@ func UnmarshalYaml(name string) (Summarize, error) {
 }
 
 func loadFile(name string) ([]byte, error) {
-	if err := isFileExist(name); err != nil {
-		return nil, err
-	}
-
 	buf, err := os.ReadFile(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s", name)
+		return nil, fmt.Errorf("failed to read %s: %w", name, err)
 	}
 	return buf, nil
 }
