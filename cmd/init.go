@@ -42,6 +42,9 @@ func init() {
 		vmInfo,
 		vmMeasure,
 		vmIntegrationCmd,
+		vmNicCmd,
+		vmHardDiskCmd,
+		vmDvdCmd,
 	)
 
 	vmIntegrationCmd.AddCommand(
@@ -110,6 +113,14 @@ func init() {
 func init() {
 	diskCmd.AddCommand(
 		diskCreate,
+		diskRemove,
+		diskInfo,
+		diskResize,
+		diskOptimize,
+		diskConvert,
+		diskMount,
+		diskDismount,
+		diskMerge,
 	)
 
 	diskCreate.Flags().StringVarP(&diskCreateOption.Path, "path", "p", "", "set path")
@@ -118,9 +129,28 @@ func init() {
 	diskCreate.Flags().StringVarP(&diskCreateOption.ParentPath, "parent-path", "", "", "set parent path")
 	diskCreate.Flags().IntVarP(&diskCreateOption.SourceDisk, "source-disk", "", 0, "set source disk")
 
+	diskResize.Flags().StringVarP(&resizeSize, "size", "s", "", "new size (e.g. 20GB)")
+	diskConvert.Flags().StringVarP(&convertDestPath, "dest", "d", "", "destination path")
+	diskConvert.Flags().StringVarP(&convertDiskType, "type", "t", "", "disk type (Dynamic or Fixed)")
+	diskMerge.Flags().StringVarP(&mergeDest, "dest", "d", "", "destination path (default: merge into parent)")
+
 	storageCmd.AddCommand(
 		storageList,
 	)
+
+	vmNicCmd.AddCommand(vmNicList, vmNicAdd, vmNicRemove, vmNicConnect)
+	vmNicAdd.Flags().StringVarP(&vmNicName, "name", "n", "", "adapter name")
+	vmNicAdd.Flags().StringVarP(&vmNicSwitch, "switch", "s", "", "switch name")
+	vmNicRemove.Flags().StringVarP(&vmNicName, "name", "n", "", "adapter name")
+	vmNicConnect.Flags().StringVarP(&vmNicName, "name", "n", "", "adapter name")
+	vmNicConnect.Flags().StringVarP(&vmNicSwitch, "switch", "s", "", "switch name")
+
+	vmHardDiskCmd.AddCommand(vmHardDiskList, vmHardDiskAdd, vmHardDiskRemove)
+	vmHardDiskAdd.Flags().StringVarP(&vmHardDiskPath, "path", "p", "", "VHD path")
+	vmHardDiskRemove.Flags().StringVarP(&vmHardDiskPath, "path", "p", "", "VHD path")
+
+	vmDvdCmd.AddCommand(vmDvdList, vmDvdAdd, vmDvdRemove, vmDvdSet, vmDvdEject)
+	vmDvdSet.Flags().StringVarP(&dvdImagePath, "image", "i", "", "ISO image path")
 }
 
 func init() {

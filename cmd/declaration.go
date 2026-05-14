@@ -33,3 +33,12 @@ var exportPath string
 var checkpointName string
 var newCheckpointName string
 var integrationServiceName string
+
+var resizeSize string
+var convertDestPath string
+var convertDiskType string
+var mergeDest string
+var vmNicName string
+var vmNicSwitch string
+var vmHardDiskPath string
+var dvdImagePath string
