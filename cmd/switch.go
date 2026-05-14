@@ -10,9 +10,9 @@ import (
 func newSwitchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "switch",
-		Short: "management switch on Hyper-V",
+		Short: "manage virtual switches",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(
@@ -117,7 +117,7 @@ func newSwitchConfigureCmd() *cobra.Command {
 		Use:   "configure",
 		Short: "Configure switch option",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(

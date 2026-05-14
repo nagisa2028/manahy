@@ -16,9 +16,9 @@ func newRootCmd() *cobra.Command {
 	var configFile string
 	cmd := &cobra.Command{
 		Use:   "manahy",
-		Short: "manahy is management tool on Hyper-V",
+		Short: "manahy is a management tool for Hyper-V",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file path")

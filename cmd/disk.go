@@ -10,9 +10,9 @@ import (
 func newDiskCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "disk",
-		Short: "management virtual disk",
+		Short: "manage virtual disks",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(

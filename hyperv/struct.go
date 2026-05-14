@@ -59,7 +59,7 @@ type VMList struct {
 	Off     []string
 }
 
-// StorageList is physical storage list.
+// StorageList holds information about physical storage devices.
 type StorageList struct {
 	Number       []string
 	FriendlyName []string
@@ -67,7 +67,7 @@ type StorageList struct {
 	SizeUnit     []string
 }
 
-// Summarize is top-level structure for manahy.yaml.
+// Summarize is the top-level structure for manahy.yaml.
 type Summarize struct {
 	Vms      map[string]VM       `yaml:"vms"`
 	Disks    map[string]Disk     `yaml:"disks"`

@@ -10,9 +10,9 @@ import (
 func newVMCmd(configFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vm",
-		Short: "management vm on Hyper-V",
+		Short: "manage virtual machines",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(
@@ -385,7 +385,7 @@ func newVMIntegrationCmd() *cobra.Command {
 		Use:   "integration",
 		Short: "manage VM integration services",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(

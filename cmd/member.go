@@ -10,9 +10,9 @@ import (
 func newMemberCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "member",
-		Short: "management Hyper-V Administrators group members",
+		Short: "manage Hyper-V Administrators group members",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(
