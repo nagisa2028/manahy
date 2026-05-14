@@ -1,22 +1,17 @@
 package hyperv
 
-import (
-	"fmt"
-	"os/exec"
-)
+import "fmt"
 
 // GetVMInfo returns processor and memory configuration for a VM.
 func GetVMInfo(name string) (string, error) {
 	if err := IsVMExist(name); err != nil {
 		return "", err
 	}
-	procOut, err := exec.Command("powershell", "-NoProfile",
-		"Get-VMProcessor -VMName '"+name+"' | Format-List VMName, Count, ExposeVirtualizationExtensions").Output()
+	procOut, err := outputPS("Get-VMProcessor -VMName " + ps(name) + " | Format-List VMName, Count, ExposeVirtualizationExtensions")
 	if err != nil {
 		return "", fmt.Errorf("failed to get processor info for VM %s", name)
 	}
-	memOut, err := exec.Command("powershell", "-NoProfile",
-		"Get-VMMemory -VMName '"+name+"' | Format-List VMName, DynamicMemoryEnabled, Startup, Minimum, Maximum, Buffer, Priority").Output()
+	memOut, err := outputPS("Get-VMMemory -VMName " + ps(name) + " | Format-List VMName, DynamicMemoryEnabled, Startup, Minimum, Maximum, Buffer, Priority")
 	if err != nil {
 		return "", fmt.Errorf("failed to get memory info for VM %s", name)
 	}
@@ -29,9 +24,9 @@ func MeasureVM(name string) (string, error) {
 	if err := IsVMExist(name); err != nil {
 		return "", err
 	}
-	script := "Enable-VMResourceMetering -VMName '" + name + "'; " +
-		"Measure-VM -VMName '" + name + "' | Format-List AvgCPUUsage, AvgRAMUsage, TotalDisk, NetworkMeteredTrafficReport"
-	out, err := exec.Command("powershell", "-NoProfile", script).Output()
+	script := "Enable-VMResourceMetering -VMName " + ps(name) + "; " +
+		"Measure-VM -VMName " + ps(name) + " | Format-List AvgCPUUsage, AvgRAMUsage, TotalDisk, NetworkMeteredTrafficReport"
+	out, err := outputPS(script)
 	if err != nil {
 		return "", fmt.Errorf("failed to measure VM %s", name)
 	}
@@ -43,8 +38,7 @@ func GetVMIntegrationServices(name string) (string, error) {
 	if err := IsVMExist(name); err != nil {
 		return "", err
 	}
-	out, err := exec.Command("powershell", "-NoProfile",
-		"Get-VMIntegrationService -VMName '"+name+"' | Format-Table Name, Enabled, PrimaryStatusDescription | Out-String").Output()
+	out, err := outputPS("Get-VMIntegrationService -VMName " + ps(name) + " | Format-Table Name, Enabled, PrimaryStatusDescription | Out-String")
 	if err != nil {
 		return "", fmt.Errorf("failed to get integration services for VM %s", name)
 	}
@@ -56,8 +50,7 @@ func EnableVMIntegrationService(name, service string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile",
-		"Enable-VMIntegrationService -VMName '"+name+"' -Name '"+service+"'").Run()
+	return runPS("Enable-VMIntegrationService -VMName " + ps(name) + " -Name " + ps(service))
 }
 
 // DisableVMIntegrationService disables a named integration service on a VM.
@@ -65,14 +58,12 @@ func DisableVMIntegrationService(name, service string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile",
-		"Disable-VMIntegrationService -VMName '"+name+"' -Name '"+service+"'").Run()
+	return runPS("Disable-VMIntegrationService -VMName " + ps(name) + " -Name " + ps(service))
 }
 
 // GetVMHost returns Hyper-V host configuration.
 func GetVMHost() (string, error) {
-	out, err := exec.Command("powershell", "-NoProfile",
-		"Get-VMHost | Format-List VirtualHardDiskPath, VirtualMachinePath, MacAddressMinimum, MacAddressMaximum, NumaSpanningEnabled, EnableEnhancedSessionMode, MaximumVirtualMachineMigrations, MaximumStorageMigrations").Output()
+	out, err := outputPS("Get-VMHost | Format-List VirtualHardDiskPath, VirtualMachinePath, MacAddressMinimum, MacAddressMaximum, NumaSpanningEnabled, EnableEnhancedSessionMode, MaximumVirtualMachineMigrations, MaximumStorageMigrations")
 	if err != nil {
 		return "", fmt.Errorf("failed to get Hyper-V host information")
 	}

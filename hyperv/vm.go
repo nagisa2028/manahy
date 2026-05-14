@@ -2,13 +2,12 @@ package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 )
 
 // GetVMList returns a list of all VMs grouped by state.
 func GetVMList() (VMList, error) {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VM | Sort-Object State | Format-Table Name, State").Output()
+	res, err := outputPS("Get-VM | Sort-Object State | Format-Table Name, State")
 	if err != nil {
 		return VMList{}, err
 	}
@@ -17,7 +16,7 @@ func GetVMList() (VMList, error) {
 
 // GetVMState returns the current state of a VM, or "NotFound" / "Unknown".
 func GetVMState(name string) string {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VM '"+name+"' | Format-Table State").Output()
+	res, err := outputPS("Get-VM " + ps(name) + " | Format-Table State")
 	if err != nil {
 		return "NotFound"
 	}
@@ -59,11 +58,11 @@ func SetVMProcessor(name string, cpu CPU) error {
 		return err
 	}
 
-	cmd := "Set-VMProcessor '" + name + "'"
+	cmd := "Set-VMProcessor " + ps(name)
 	cmd += " -Count " + strconv.Itoa(cpu.Thread)
 	cmd += " -ExposeVirtualizationExtensions $" + strconv.FormatBool(cpu.Nested)
 
-	return exec.Command("powershell", "-NoProfile", cmd).Run()
+	return runPS(cmd)
 }
 
 // SetVMMemory configures the memory settings of a VM.
@@ -72,11 +71,11 @@ func SetVMMemory(name string, memory Memory) error {
 		return err
 	}
 
-	cmd := "Set-VMMemory -VMName '" + name + "'"
+	cmd := "Set-VMMemory -VMName " + ps(name)
 	cmd += " -StartupBytes " + memory.Size
 	cmd += " -DynamicMemoryEnabled $" + strconv.FormatBool(memory.Dynamic)
 
-	return exec.Command("powershell", "-NoProfile", cmd).Run()
+	return runPS(cmd)
 }
 
 // SetVMHardDisk attaches hard disk drives to a VM.
@@ -90,10 +89,10 @@ func SetVMHardDisk(name string, disks []string) error {
 			return err
 		}
 
-		cmd := "Add-VMHardDiskDrive -VMName '" + name + "'"
-		cmd += " -Path " + disk
+		cmd := "Add-VMHardDiskDrive -VMName " + ps(name)
+		cmd += " -Path " + ps(disk)
 
-		if err := exec.Command("powershell", "-NoProfile", cmd).Run(); err != nil {
+		if err := runPS(cmd); err != nil {
 			return err
 		}
 	}
@@ -109,10 +108,10 @@ func SetVMImageFile(name string, image string) error {
 		return err
 	}
 
-	cmd := "Add-VMDvdDrive -VMName '" + name + "'"
-	cmd += " -Path " + image
+	cmd := "Add-VMDvdDrive -VMName " + ps(name)
+	cmd += " -Path " + ps(image)
 
-	return exec.Command("powershell", "-NoProfile", cmd).Run()
+	return runPS(cmd)
 }
 
 // SetVMSwitch connects network adapters of a VM to virtual switches.
@@ -125,10 +124,10 @@ func SetVMSwitch(name string, networks []string) error {
 			return fmt.Errorf("failed to get state of switch %s", network)
 		}
 
-		cmd := "Add-VMNetworkAdapter -VMName " + name
-		cmd += " -SwitchName " + network
+		cmd := "Add-VMNetworkAdapter -VMName " + ps(name)
+		cmd += " -SwitchName " + ps(network)
 
-		if err := exec.Command("powershell", "-NoProfile", cmd).Run(); err != nil {
+		if err := runPS(cmd); err != nil {
 			return err
 		}
 	}
@@ -143,11 +142,11 @@ func CreateVM(newVM VM, output bool) error {
 		return err
 	}
 
-	cmd := "New-VM -Name " + newVM.Name
+	cmd := "New-VM -Name " + ps(newVM.Name)
 	cmd += " -Generation " + strconv.Itoa(newVM.Generation)
-	cmd += " -Path " + newVM.Path
+	cmd += " -Path " + ps(newVM.Path)
 
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
+	err = runPS(cmd)
 	printError("Create VM", err, output)
 	if err != nil {
 		return fmt.Errorf("failed to create VM %s", newVM.Name)
@@ -188,7 +187,7 @@ func RemoveVM(name string, output bool) error {
 		return err
 	}
 
-	err := exec.Command("powershell", "-NoProfile", "Remove-VM -Name '"+name+"' -Force").Run()
+	err := runPS("Remove-VM -Name " + ps(name) + " -Force")
 	printError("Remove VM", err, output)
 	return err
 }
@@ -201,7 +200,7 @@ func RenameVM(name string, newName string) error {
 	if err := IsNotVMExist(newName); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Rename-VM -Name '"+name+"' -NewName '"+newName+"'").Run()
+	return runPS("Rename-VM -Name " + ps(name) + " -NewName " + ps(newName))
 }
 
 // ConnectVM opens a VM console connection.
@@ -209,7 +208,7 @@ func ConnectVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "vmconnect localhost '"+name+"'").Run()
+	return runPS("vmconnect localhost " + ps(name))
 }
 
 // StartVM starts a VM.
@@ -217,7 +216,7 @@ func StartVM(name string) error {
 	if GetVMState(name) == "Running" {
 		return fmt.Errorf("VM %s is already running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Start-VM '"+name+"'").Run()
+	return runPS("Start-VM " + ps(name))
 }
 
 // StopVM shuts down a VM gracefully.
@@ -225,7 +224,7 @@ func StopVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Stop-VM -Name '"+name+"'").Run()
+	return runPS("Stop-VM -Name " + ps(name))
 }
 
 // DestroyVM force-stops a VM.
@@ -233,7 +232,7 @@ func DestroyVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Stop-VM -Force -Name '"+name+"'").Run()
+	return runPS("Stop-VM -Force -Name " + ps(name))
 }
 
 // SaveVM saves the state of a VM.
@@ -241,7 +240,7 @@ func SaveVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Save-VM -Name '"+name+"'").Run()
+	return runPS("Save-VM -Name " + ps(name))
 }
 
 // SuspendVM pauses a VM.
@@ -249,7 +248,7 @@ func SuspendVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Suspend-VM -Name '"+name+"'").Run()
+	return runPS("Suspend-VM -Name " + ps(name))
 }
 
 // RestartVM restarts a VM.
@@ -257,7 +256,7 @@ func RestartVM(name string) error {
 	if GetVMState(name) != "Running" {
 		return fmt.Errorf("VM %s is not running", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Restart-VM -Name '"+name+"' -Force").Run()
+	return runPS("Restart-VM -Name " + ps(name) + " -Force")
 }
 
 // ResumeVM resumes a paused VM.
@@ -265,7 +264,7 @@ func ResumeVM(name string) error {
 	if GetVMState(name) != "Paused" {
 		return fmt.Errorf("VM %s is not paused", name)
 	}
-	return exec.Command("powershell", "-NoProfile", "Resume-VM -Name '"+name+"'").Run()
+	return runPS("Resume-VM -Name " + ps(name))
 }
 
 // ExportVM exports a VM to the specified directory.
@@ -273,12 +272,12 @@ func ExportVM(name, path string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Export-VM -Name '"+name+"' -Path '"+path+"'").Run()
+	return runPS("Export-VM -Name " + ps(name) + " -Path " + ps(path))
 }
 
 // ImportVM registers a VM from a .vmcx file path.
 func ImportVM(path string) error {
-	return exec.Command("powershell", "-NoProfile", "Import-VM -Path '"+path+"'").Run()
+	return runPS("Import-VM -Path " + ps(path))
 }
 
 // MoveVMStorage moves all VM storage files to a new directory on the same host.
@@ -286,8 +285,7 @@ func MoveVMStorage(name, destPath string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile",
-		"Move-VMStorage -VMName '"+name+"' -DestinationStoragePath '"+destPath+"'").Run()
+	return runPS("Move-VMStorage -VMName " + ps(name) + " -DestinationStoragePath " + ps(destPath))
 }
 
 // CopyVM exports the source VM then imports it as a new VM with a different name.
@@ -299,11 +297,11 @@ func CopyVM(name, newName, destPath string) error {
 	if err := IsNotVMExist(newName); err != nil {
 		return err
 	}
-	script := "Export-VM -Name '" + name + "' -Path '" + destPath + "'; " +
-		"$vmcx = (Get-ChildItem -Recurse -Path '" + destPath + "\\" + name + "' -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
+	script := "Export-VM -Name " + ps(name) + " -Path " + ps(destPath) + "; " +
+		"$vmcx = (Get-ChildItem -Recurse -Path " + ps(destPath+"\\"+name) + " -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
 		"$newVM = Import-VM -Path $vmcx -Copy -GenerateNewId; " +
-		"Rename-VM -VM $newVM -NewName '" + newName + "'"
-	return exec.Command("powershell", "-NoProfile", script).Run()
+		"Rename-VM -VM $newVM -NewName " + ps(newName)
+	return runPS(script)
 }
 
 func checkVMParam(newVM VM) error {

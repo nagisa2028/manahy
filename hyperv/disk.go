@@ -2,7 +2,6 @@ package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 )
@@ -19,7 +18,7 @@ func CreateDisk(newDisk Disk, output bool) error {
 		return err
 	}
 
-	cmd := "New-VHD -Path " + newDisk.Path
+	cmd := "New-VHD -Path " + ps(newDisk.Path)
 	switch newDisk.Type {
 	case "dynamic":
 		cmd += " -SizeBytes " + newDisk.Size
@@ -28,11 +27,11 @@ func CreateDisk(newDisk Disk, output bool) error {
 		cmd += " -SourceDisk " + strconv.Itoa(newDisk.SourceDisk)
 		cmd += " -Fixed"
 	case "differencing":
-		cmd += " -ParentPath " + newDisk.ParentPath
+		cmd += " -ParentPath " + ps(newDisk.ParentPath)
 		cmd += " -Differencing"
 	}
 
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
+	err = runPS(cmd)
 	printError("Create Disk", err, output)
 	return err
 }
@@ -43,7 +42,7 @@ func RemoveDisk(path string, output bool) error {
 		return err
 	}
 
-	err := exec.Command("powershell", "-NoProfile", "rm '"+path+"'").Run()
+	err := runPS("Remove-Item " + ps(path))
 	printError("Remove Disk", err, output)
 	return err
 }
@@ -87,7 +86,7 @@ func GetVHDInfo(path string) (string, error) {
 	if err := isFileExist(path); err != nil {
 		return "", err
 	}
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VHD -Path '"+path+"' | Format-List Path, VhdType, FileSize, Size, ParentPath, Attached, DiskNumber").Output()
+	res, err := outputPS("Get-VHD -Path " + ps(path) + " | Format-List Path, VhdType, FileSize, Size, ParentPath, Attached, DiskNumber")
 	if err != nil {
 		return "", fmt.Errorf("failed to get VHD info for %s", path)
 	}
@@ -102,7 +101,7 @@ func ResizeVHD(path, size string) error {
 	if err := checkDiskSize(size); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Resize-VHD -Path '"+path+"' -SizeBytes "+size).Run()
+	return runPS("Resize-VHD -Path " + ps(path) + " -SizeBytes " + size)
 }
 
 // OptimizeVHD compacts a VHD using full mode optimization.
@@ -110,7 +109,7 @@ func OptimizeVHD(path string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Optimize-VHD -Path '"+path+"' -Mode Full").Run()
+	return runPS("Optimize-VHD -Path " + ps(path) + " -Mode Full")
 }
 
 // ConvertVHD converts a VHD to a new format at the destination path.
@@ -118,11 +117,11 @@ func ConvertVHD(path, destPath, diskType string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	cmd := "Convert-VHD -Path '" + path + "' -DestinationPath '" + destPath + "'"
+	cmd := "Convert-VHD -Path " + ps(path) + " -DestinationPath " + ps(destPath)
 	if diskType != "" {
-		cmd += " -VHDType " + diskType
+		cmd += " -VHDType " + ps(diskType)
 	}
-	return exec.Command("powershell", "-NoProfile", cmd).Run()
+	return runPS(cmd)
 }
 
 // MountVHD mounts a VHD.
@@ -130,7 +129,7 @@ func MountVHD(path string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Mount-VHD -Path '"+path+"'").Run()
+	return runPS("Mount-VHD -Path " + ps(path))
 }
 
 // DismountVHD dismounts a VHD.
@@ -138,7 +137,7 @@ func DismountVHD(path string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Dismount-VHD -Path '"+path+"'").Run()
+	return runPS("Dismount-VHD -Path " + ps(path))
 }
 
 // MergeVHD merges a differencing VHD into its parent or a specified destination.
@@ -146,9 +145,9 @@ func MergeVHD(path, destPath string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	cmd := "Merge-VHD -Path '" + path + "'"
+	cmd := "Merge-VHD -Path " + ps(path)
 	if destPath != "" {
-		cmd += " -DestinationPath '" + destPath + "'"
+		cmd += " -DestinationPath " + ps(destPath)
 	}
-	return exec.Command("powershell", "-NoProfile", cmd).Run()
+	return runPS(cmd)
 }

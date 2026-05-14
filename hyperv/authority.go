@@ -2,13 +2,12 @@ package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 )
 
 // GetGroupMember returns the list of Hyper-V Administrators group members.
 func GetGroupMember() ([]string, error) {
-	res, err := exec.Command("powershell", "-NoProfile", "(Get-LocalGroupMember -Group 'Hyper-V Administrators' | Format-Table Name | Out-String).Trim()").Output()
+	res, err := outputPS("(Get-LocalGroupMember -Group 'Hyper-V Administrators' | Format-Table Name | Out-String).Trim()")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Hyper-V Administrators members")
 	}
@@ -28,7 +27,7 @@ func GetGroupMember() ([]string, error) {
 
 // AddGroupMember adds a user to the Hyper-V Administrators group.
 func AddGroupMember(name string) error {
-	_, err := exec.Command("powershell", "-NoProfile", "Add-LocalGroupMember -Group 'Hyper-V Administrators' -Member "+name).Output()
+	_, err := outputPS("Add-LocalGroupMember -Group 'Hyper-V Administrators' -Member " + ps(name))
 	if err != nil {
 		return fmt.Errorf("failed to add %s to Hyper-V Administrators", name)
 	}
@@ -37,7 +36,7 @@ func AddGroupMember(name string) error {
 
 // RemoveGroupMember removes a user from the Hyper-V Administrators group.
 func RemoveGroupMember(name string) error {
-	_, err := exec.Command("powershell", "-NoProfile", "Remove-LocalGroupMember -Group 'Hyper-V Administrators' -Member "+name).Output()
+	_, err := outputPS("Remove-LocalGroupMember -Group 'Hyper-V Administrators' -Member " + ps(name))
 	if err != nil {
 		return fmt.Errorf("failed to remove %s from Hyper-V Administrators", name)
 	}

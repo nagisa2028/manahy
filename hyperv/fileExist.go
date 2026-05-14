@@ -2,13 +2,12 @@ package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 )
 
 func searchFilePath(path string) (bool, error) {
-	res, e := exec.Command("powershell", "-NoProfile", "Test-Path \""+path+"\"").Output()
+	res, e := outputPS("Test-Path " + ps(path))
 	if e != nil {
 		return false, fmt.Errorf("failed to execute Test-Path")
 	}

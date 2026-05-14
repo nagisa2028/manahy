@@ -1,16 +1,13 @@
 package hyperv
 
-import (
-	"fmt"
-	"os/exec"
-)
+import "fmt"
 
 // GetVMDvdDrives returns DVD drives attached to a VM.
 func GetVMDvdDrives(vmName string) (string, error) {
 	if err := IsVMExist(vmName); err != nil {
 		return "", err
 	}
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VMDvdDrive -VMName '"+vmName+"' | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String").Output()
+	res, err := outputPS("Get-VMDvdDrive -VMName " + ps(vmName) + " | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String")
 	if err != nil {
 		return "", fmt.Errorf("failed to get DVD drives for VM %s", vmName)
 	}
@@ -22,7 +19,7 @@ func AddVMDvdDrive(vmName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Add-VMDvdDrive -VMName '"+vmName+"'").Run()
+	return runPS("Add-VMDvdDrive -VMName " + ps(vmName))
 }
 
 // RemoveVMDvdDrive removes the first DVD drive from a VM.
@@ -30,20 +27,21 @@ func RemoveVMDvdDrive(vmName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return exec.Command("powershell", "-NoProfile", "Get-VMDvdDrive -VMName '"+vmName+"' | Select-Object -First 1 | Remove-VMDvdDrive").Run()
+	return runPS("Get-VMDvdDrive -VMName " + ps(vmName) + " | Select-Object -First 1 | Remove-VMDvdDrive")
 }
 
 // SetVMDvdDrive sets the ISO image path on the first DVD drive of a VM.
+// Pass an empty imagePath to eject the current image.
 func SetVMDvdDrive(vmName, imagePath string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
 	pathParam := "$null"
 	if imagePath != "" {
-		pathParam = "'" + imagePath + "'"
+		pathParam = ps(imagePath)
 	}
-	script := "$dvd = Get-VMDvdDrive -VMName '" + vmName + "' | Select-Object -First 1; " +
-		"Set-VMDvdDrive -VMName '" + vmName + "' -ControllerNumber $dvd.ControllerNumber " +
+	script := "$dvd = Get-VMDvdDrive -VMName " + ps(vmName) + " | Select-Object -First 1; " +
+		"Set-VMDvdDrive -VMName " + ps(vmName) + " -ControllerNumber $dvd.ControllerNumber " +
 		"-ControllerLocation $dvd.ControllerLocation -Path " + pathParam
-	return exec.Command("powershell", "-NoProfile", script).Run()
+	return runPS(script)
 }
