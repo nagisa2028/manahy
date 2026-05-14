@@ -8,7 +8,8 @@ import (
 )
 
 func newRemoveCmd(configFile *string) *cobra.Command {
-	return &cobra.Command{
+	var dryRun bool
+	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "remove vm, disk and switch from config file",
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -20,7 +21,13 @@ func newRemoveCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if dryRun {
+				hyperv.DryRunRemove(data, os.Stdout)
+				return nil
+			}
 			return hyperv.RemoveByStruct(data, os.Stderr)
 		},
 	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be removed without making changes")
+	return cmd
 }
