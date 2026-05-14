@@ -1,8 +1,6 @@
+// Package logging provides logging utilities for manahy.
 package logging
 
-import (
-)
-
-func Logginng(log string) {
-
+// Logginng writes a log entry. Currently a no-op placeholder.
+func Logginng(_ string) {
 }

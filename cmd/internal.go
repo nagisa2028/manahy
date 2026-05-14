@@ -23,6 +23,9 @@ func confirmAction(prompt string, force bool) bool {
 	if scanner.Scan() {
 		return strings.EqualFold(strings.TrimSpace(scanner.Text()), "y")
 	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "error reading input: %s\n", err)
+	}
 	return false
 }
 

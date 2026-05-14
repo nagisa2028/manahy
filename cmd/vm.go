@@ -133,6 +133,9 @@ func newVMCreateCmd(configFile *string) *cobra.Command {
 				vm.Networks = append(vm.Networks, vmSwitch)
 			}
 			// --secure-boot / --no-secure-boot only apply to Gen2
+			if secureBoot && noSecureBoot {
+				return fmt.Errorf("--secure-boot and --no-secure-boot are mutually exclusive")
+			}
 			if secureBoot || noSecureBoot || secureBootTemplate != "" {
 				enabled := !noSecureBoot
 				vm.SecureBoot = &enabled
