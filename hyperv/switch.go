@@ -3,6 +3,7 @@ package hyperv
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // GetSwitchList returns a list of all virtual switches grouped by type.
@@ -104,7 +105,7 @@ func ChangeSwitchType(name string, switchType string) error {
 	if err := checkSwitchType(switchType); err != nil {
 		return err
 	}
-	if nameType == switchType {
+	if strings.EqualFold(nameType, switchType) {
 		return fmt.Errorf("switch %s is already of type %s", name, switchType)
 	}
 	return runPS("Set-VMSwitch " + ps(name) + " -SwitchType " + switchType)

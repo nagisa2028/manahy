@@ -12,6 +12,15 @@ const psTimeout = 30 * time.Second
 // psLongTimeout is used for operations that transfer or process large disk images.
 const psLongTimeout = 10 * time.Minute
 
+// psRunHook and psOutputHook replace the real PowerShell executors in tests.
+// Both are nil in production; tests set them via withPS() and register cleanup.
+//
+//nolint:gochecknoglobals
+var (
+	psRunHook    func(string) error
+	psOutputHook func(string) ([]byte, error)
+)
+
 // ps returns s as a PowerShell single-quoted string literal.
 // Single quotes within s are escaped by doubling them, preventing injection
 // when user-controlled values are embedded in PowerShell commands.
@@ -21,6 +30,9 @@ func ps(s string) string {
 
 // runPS executes a PowerShell command string with a 30-second timeout.
 func runPS(cmd string) error {
+	if psRunHook != nil {
+		return psRunHook(cmd)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), psTimeout)
 	defer cancel()
 	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Run()
@@ -28,6 +40,9 @@ func runPS(cmd string) error {
 
 // outputPS executes a PowerShell command string and returns its output.
 func outputPS(cmd string) ([]byte, error) {
+	if psOutputHook != nil {
+		return psOutputHook(cmd)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), psTimeout)
 	defer cancel()
 	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Output()
@@ -36,6 +51,9 @@ func outputPS(cmd string) ([]byte, error) {
 // runPSLong executes a PowerShell command with a 10-minute timeout for long-running
 // operations such as exporting, importing, moving, or converting large disk images.
 func runPSLong(cmd string) error {
+	if psRunHook != nil {
+		return psRunHook(cmd)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), psLongTimeout)
 	defer cancel()
 	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Run()
