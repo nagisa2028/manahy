@@ -28,7 +28,7 @@ func newHostShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
 		Short: "show Hyper-V host configuration",
-		Args:  cobra.RangeArgs(0, 0),
+		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			out, err := hyperv.GetVMHost()
 			if err != nil {

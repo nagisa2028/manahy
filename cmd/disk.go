@@ -34,7 +34,7 @@ func newDiskCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create virtual disk",
-		Args:  cobra.RangeArgs(0, 0),
+		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return hyperv.CreateDisk(opt, true)
 		},

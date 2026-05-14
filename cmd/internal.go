@@ -7,6 +7,9 @@ import (
 	"github.com/DevelopNaoki/manahy/hyperv"
 )
 
+// maxBulkArgs is the upper bound on resource names accepted by bulk operations.
+const maxBulkArgs = 100
+
 func displayList(list []string, message string) {
 	fmt.Println(message)
 	for _, item := range list {

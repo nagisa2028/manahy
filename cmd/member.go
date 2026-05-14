@@ -46,7 +46,7 @@ func newMemberAddCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "add",
 		Short: "add a user to Hyper-V Administrators",
-		Args:  cobra.RangeArgs(1, 100),
+		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
 			for _, name := range args {
 				if err := hyperv.AddGroupMember(name); err != nil {
@@ -62,7 +62,7 @@ func newMemberRemoveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove",
 		Short: "remove a user from Hyper-V Administrators",
-		Args:  cobra.RangeArgs(1, 100),
+		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
 			for _, name := range args {
 				if err := hyperv.RemoveGroupMember(name); err != nil {

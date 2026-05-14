@@ -9,6 +9,7 @@ import (
 
 const reSplitLine = "\r\n|\n"
 const reBlankLine = "^[-\\s]*$"
+const bytesPerKibibyte = 1024
 
 //nolint:gochecknoglobals
 var (
@@ -110,8 +111,8 @@ func computeCapacity(raw string) (float64, string, error) {
 		return 0, "", fmt.Errorf("failed to parse capacity value: %s", raw)
 	}
 	unit := "B"
-	for v >= 1024 {
-		v /= 1024
+	for v >= bytesPerKibibyte {
+		v /= bytesPerKibibyte
 		switch unit {
 		case "B":
 			unit = "KB"

@@ -23,7 +23,7 @@ func newStorageListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "listing all storage",
-		Args:  cobra.RangeArgs(0, 0),
+		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			storageList, err := hyperv.GetStorageList()
 			if err != nil {

@@ -35,7 +35,7 @@ func newSwitchListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "Print switch list",
-		Args:  cobra.RangeArgs(0, 0),
+		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if opts.external || opts.internal || opts.private {
 				opts.all = false
@@ -68,7 +68,7 @@ func newSwitchCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create switch",
-		Args:  cobra.RangeArgs(0, 0),
+		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if opt.Name == "" || opt.Type == "" {
 				return fmt.Errorf("--name and --type are required")

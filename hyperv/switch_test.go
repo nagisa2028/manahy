@@ -334,8 +334,8 @@ func TestChangeSwitchType(t *testing.T) {
 		if err == nil {
 			t.Fatal("ChangeSwitchType: expected error for invalid type, got nil")
 		}
-		if !strings.Contains(err.Error(), "undefined switch type") {
-			t.Errorf("ChangeSwitchType: error %q does not contain 'undefined switch type'", err.Error())
+		if !strings.Contains(err.Error(), "invalid switch type") {
+			t.Errorf("ChangeSwitchType: error %q does not contain 'invalid switch type'", err.Error())
 		}
 	})
 }

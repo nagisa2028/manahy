@@ -11,7 +11,7 @@ func GetGroupMember() ([]string, error) {
 
 	var members []string
 	for i, line := range reSplit.Split(string(res), -1) {
-		if i < 2 {
+		if i < 2 { // skip Format-Table header line and separator line
 			continue
 		}
 		if line != "" {

@@ -6,6 +6,13 @@ import (
 	"strconv"
 )
 
+// Hyper-V supports only generation 1 and 2.
+const (
+	minVMGeneration     = 1
+	maxVMGeneration     = 2
+	minVMProcessorCount = 1
+)
+
 //nolint:gochecknoglobals
 var reMemorySize = regexp.MustCompile(`^[0-9]+[TGM]B$`)
 
@@ -328,8 +335,8 @@ func checkVMParam(newVM VM) error {
 }
 
 func checkVMGeneration(generation int) error {
-	if generation < 1 || generation > 2 {
-		return fmt.Errorf("generation must be 1 or 2")
+	if generation < minVMGeneration || generation > maxVMGeneration {
+		return fmt.Errorf("generation must be %d or %d", minVMGeneration, maxVMGeneration)
 	}
 	return nil
 }
@@ -339,8 +346,8 @@ func checkVMPath(name string, path string) error {
 }
 
 func checkVMProcessor(cpu CPU) error {
-	if cpu.Thread < 1 {
-		return fmt.Errorf("vcpu count must be at least 1")
+	if cpu.Thread < minVMProcessorCount {
+		return fmt.Errorf("vcpu count must be at least %d", minVMProcessorCount)
 	}
 	return nil
 }
