@@ -12,7 +12,7 @@ func newVMNicCmd() *cobra.Command {
 		Use:   "nic",
 		Short: "manage VM network adapters",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(
@@ -20,6 +20,7 @@ func newVMNicCmd() *cobra.Command {
 		newVMNicAddCmd(),
 		newVMNicRemoveCmd(),
 		newVMNicConnectCmd(),
+		newVMNicVlanCmd(),
 	)
 	return cmd
 }
@@ -67,6 +68,23 @@ func newVMNicRemoveCmd() *cobra.Command {
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "adapter name")
 	_ = c.MarkFlagRequired("name")
+	return c
+}
+
+func newVMNicVlanCmd() *cobra.Command {
+	var name string
+	var vlanID int
+	c := &cobra.Command{
+		Use:   "vlan",
+		Short: "set VLAN ID on a network adapter (0 = untagged)",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.SetVMNetworkAdapterVlan(args[0], name, vlanID)
+		},
+	}
+	c.Flags().StringVarP(&name, "name", "n", "", "adapter name")
+	_ = c.MarkFlagRequired("name")
+	c.Flags().IntVar(&vlanID, "vlan", 0, "VLAN ID (0 = untagged/remove VLAN tag)")
 	return c
 }
 

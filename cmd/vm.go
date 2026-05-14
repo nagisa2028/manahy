@@ -50,18 +50,35 @@ func newVMListCmd() *cobra.Command {
 		inactive bool
 		paused   bool
 		all      bool
+		state    string
 	}{active: true}
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "Print VM list",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			if opts.saved || opts.inactive || opts.paused || opts.all {
-				opts.active = false
-			}
 			vmList, err := hyperv.GetVMList()
 			if err != nil {
 				return err
+			}
+			// --state takes precedence over individual flags
+			if opts.state != "" {
+				switch opts.state {
+				case "running":
+					displayList(vmList.Running, "Running VM's")
+				case "saved":
+					displayList(vmList.Saved, "Saved VM's")
+				case "paused":
+					displayList(vmList.Paused, "Paused VM's")
+				case "off":
+					displayList(vmList.Off, "Inactive VM's")
+				default:
+					return fmt.Errorf("unknown state %q: use running, saved, paused, or off", opts.state)
+				}
+				return nil
+			}
+			if opts.saved || opts.inactive || opts.paused || opts.all {
+				opts.active = false
 			}
 			if opts.active || opts.all {
 				displayList(vmList.Running, "Running VM's")
@@ -83,6 +100,7 @@ func newVMListCmd() *cobra.Command {
 	c.Flags().BoolVarP(&opts.saved, "saved", "s", false, "list saved vm's")
 	c.Flags().BoolVarP(&opts.paused, "paused", "p", false, "list paused vm's")
 	c.Flags().BoolVarP(&opts.all, "all", "a", false, "list all vm's")
+	c.Flags().StringVar(&opts.state, "state", "", "filter by state: running, saved, paused, off")
 	return c
 }
 
@@ -100,6 +118,8 @@ func newVMStateCmd() *cobra.Command {
 func newVMCreateCmd(configFile *string) *cobra.Command {
 	var vm hyperv.VM
 	var vmDisk, vmSwitch string
+	var secureBoot, noSecureBoot bool
+	var secureBootTemplate string
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "create VM",
@@ -111,6 +131,12 @@ func newVMCreateCmd(configFile *string) *cobra.Command {
 			}
 			if vmSwitch != "" {
 				vm.Networks = append(vm.Networks, vmSwitch)
+			}
+			// --secure-boot / --no-secure-boot only apply to Gen2
+			if secureBoot || noSecureBoot || secureBootTemplate != "" {
+				enabled := !noSecureBoot
+				vm.SecureBoot = &enabled
+				vm.SecureBootTemplate = secureBootTemplate
 			}
 			return hyperv.CreateVM(vm, true)
 		},
@@ -128,15 +154,23 @@ func newVMCreateCmd(configFile *string) *cobra.Command {
 	c.Flags().StringVarP(&vm.Image, "image", "i", "", "image path")
 	c.Flags().StringVarP(&vmDisk, "disk", "d", "", "disk path or alias")
 	c.Flags().StringVarP(&vmSwitch, "network", "s", "", "switch name")
+	c.Flags().BoolVar(&secureBoot, "secure-boot", false, "enable Secure Boot (Gen2 only)")
+	c.Flags().BoolVar(&noSecureBoot, "no-secure-boot", false, "disable Secure Boot (Gen2 only)")
+	c.Flags().StringVar(&secureBootTemplate, "secure-boot-template", "", "Secure Boot template, e.g. MicrosoftWindows (Gen2 only)")
 	return c
 }
 
 func newVMRemoveCmd() *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	c := &cobra.Command{
 		Use:   "remove",
 		Short: "remove VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
+			prompt := fmt.Sprintf("Remove %d VM(s)?", len(args))
+			if !confirmAction(prompt, force) {
+				return nil
+			}
 			for _, name := range args {
 				if err := hyperv.RemoveVM(name, false); err != nil {
 					return err
@@ -145,6 +179,8 @@ func newVMRemoveCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return c
 }
 
 func newVMRenameCmd() *cobra.Command {

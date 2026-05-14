@@ -17,6 +17,7 @@ func newSwitchCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newSwitchListCmd(),
+		newSwitchInfoCmd(),
 		newSwitchCreateCmd(),
 		newSwitchRemoveCmd(),
 		newSwitchRenameCmd(),
@@ -63,6 +64,22 @@ func newSwitchListCmd() *cobra.Command {
 	return c
 }
 
+func newSwitchInfoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "info",
+		Short: "show detailed information about a virtual switch",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			out, err := hyperv.GetSwitchInfo(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Print(out)
+			return nil
+		},
+	}
+}
+
 func newSwitchCreateCmd() *cobra.Command {
 	var opt hyperv.VMSwitch
 	c := &cobra.Command{
@@ -87,14 +104,26 @@ func newSwitchCreateCmd() *cobra.Command {
 }
 
 func newSwitchRemoveCmd() *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	c := &cobra.Command{
 		Use:   "remove",
-		Short: "Remove switch",
-		Args:  cobra.RangeArgs(1, 1),
+		Short: "remove a virtual switch",
+		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return hyperv.RemoveSwitch(args[0])
+			prompt := fmt.Sprintf("Remove %d switch(es)?", len(args))
+			if !confirmAction(prompt, force) {
+				return nil
+			}
+			for _, name := range args {
+				if err := hyperv.RemoveSwitch(name); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	}
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return c
 }
 
 func newSwitchRenameCmd() *cobra.Command {

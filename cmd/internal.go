@@ -1,14 +1,30 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
 )
 
 // maxBulkArgs is the upper bound on resource names accepted by bulk operations.
 const maxBulkArgs = 100
+
+// confirmAction prompts the user to confirm a destructive action.
+// Returns true immediately when force is set.
+func confirmAction(prompt string, force bool) bool {
+	if force {
+		return true
+	}
+	fmt.Printf("%s [y/N]: ", prompt)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return strings.EqualFold(strings.TrimSpace(scanner.Text()), "y")
+	}
+	return false
+}
 
 func displayList(list []string, message string) {
 	fmt.Println(message)

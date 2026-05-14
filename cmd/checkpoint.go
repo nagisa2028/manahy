@@ -73,16 +73,22 @@ func newCheckpointRestoreCmd() *cobra.Command {
 
 func newCheckpointRemoveCmd() *cobra.Command {
 	var name string
+	var force bool
 	c := &cobra.Command{
 		Use:   "remove",
 		Short: "delete a checkpoint from a VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
+			prompt := fmt.Sprintf("Remove checkpoint %q from VM %q?", name, args[0])
+			if !confirmAction(prompt, force) {
+				return nil
+			}
 			return hyperv.RemoveCheckpoint(args[0], name)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
 	_ = c.MarkFlagRequired("name")
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
 	return c
 }
 

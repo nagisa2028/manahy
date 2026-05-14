@@ -44,6 +44,8 @@ const (
 const (
 	cmdSetVMProcessor = "Set-VMProcessor"
 	cmdSetVMMemory    = "Set-VMMemory"
+	cmdSetVMFirmware  = "Set-VMFirmware"
+	cmdGetVMFirmware  = "Get-VMFirmware"
 )
 
 // VM info / metrics.
@@ -64,6 +66,7 @@ const (
 	cmdAddVMNetworkAdapter     = "Add-VMNetworkAdapter"
 	cmdRemoveVMNetworkAdapter  = "Remove-VMNetworkAdapter"
 	cmdConnectVMNetworkAdapter = "Connect-VMNetworkAdapter"
+	cmdSetVMNetworkAdapterVlan = "Set-VMNetworkAdapterVlan"
 )
 
 // Hard disk drive.

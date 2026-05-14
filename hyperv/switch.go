@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// GetSwitchInfo returns detailed information about a virtual switch.
+func GetSwitchInfo(name string) (string, error) {
+	if err := IsSwitchExist(name); err != nil {
+		return "", err
+	}
+	out, err := outputPS(cmdGetVMSwitch + " -Name " + ps(name) +
+		" | Format-List Name, SwitchType, NetAdapterInterfaceDescription, AllowManagementOS, Notes | Out-String")
+	if err != nil {
+		return "", fmt.Errorf("failed to get info for switch %s", name)
+	}
+	return string(out), nil
+}
+
 // GetSwitchList returns a list of all virtual switches grouped by type.
 func GetSwitchList() (SwitchList, error) {
 	res, err := outputPS(cmdGetVMSwitch + " | Sort-Object SwitchType | Format-Table Name, SwitchType")

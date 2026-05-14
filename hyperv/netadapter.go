@@ -44,3 +44,22 @@ func ConnectVMNetworkAdapter(vmName, name, switchName string) error {
 	}
 	return runPS(cmdConnectVMNetworkAdapter + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -SwitchName " + ps(switchName))
 }
+
+// SetVMNetworkAdapterVlan assigns an access VLAN ID to a VM network adapter.
+// Pass vlanID=0 to remove VLAN tagging (untagged mode).
+func SetVMNetworkAdapterVlan(vmName, name string, vlanID int) error {
+	if err := IsVMExist(vmName); err != nil {
+		return err
+	}
+	var cmd string
+	if vlanID == 0 {
+		cmd = cmdSetVMNetworkAdapterVlan + " -VMName " + ps(vmName) + " -VMNetworkAdapterName " + ps(name) + " -Untagged"
+	} else {
+		cmd = cmdSetVMNetworkAdapterVlan + " -VMName " + ps(vmName) + " -VMNetworkAdapterName " + ps(name) +
+			" -Access -VlanId " + fmt.Sprintf("%d", vlanID)
+	}
+	if err := runPS(cmd); err != nil {
+		return fmt.Errorf("failed to set VLAN for adapter %s on VM %s", name, vmName)
+	}
+	return nil
+}

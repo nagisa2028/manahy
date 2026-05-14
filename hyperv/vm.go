@@ -189,7 +189,18 @@ func CreateVM(newVM VM, output bool) error {
 
 	err = SetVMSwitch(newVM.Name, newVM.Networks)
 	printError("Set VMSwitch", err, output)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if newVM.Generation == maxVMGeneration && newVM.SecureBoot != nil {
+		err = SetVMSecureBoot(newVM.Name, *newVM.SecureBoot, newVM.SecureBootTemplate)
+		printError("Set Secure Boot", err, output)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RemoveVM deletes a VM forcefully.

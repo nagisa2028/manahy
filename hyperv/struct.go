@@ -3,15 +3,17 @@ package hyperv
 
 // VM defines the configuration for creating a virtual machine.
 type VM struct {
-	Name       string   `yaml:"-"`
-	Count      int      `yaml:"count,omitempty"`
-	Generation int      `yaml:"generation"`
-	CPU        CPU      `yaml:"cpu"`
-	Memory     Memory   `yaml:"memory"`
-	Path       string   `yaml:"path"`
-	Image      string   `yaml:"image,omitempty"`
-	Disks      []string `yaml:"disks"`
-	Networks   []string `yaml:"networks"`
+	Name               string   `yaml:"-"`
+	Count              int      `yaml:"count,omitempty"`
+	Generation         int      `yaml:"generation"`
+	CPU                CPU      `yaml:"cpu"`
+	Memory             Memory   `yaml:"memory"`
+	Path               string   `yaml:"path"`
+	Image              string   `yaml:"image,omitempty"`
+	Disks              []string `yaml:"disks"`
+	Networks           []string `yaml:"networks"`
+	SecureBoot         *bool    `yaml:"secure-boot,omitempty"`
+	SecureBootTemplate string   `yaml:"secure-boot-template,omitempty"`
 }
 
 // CPU defines the processor configuration for a virtual machine.

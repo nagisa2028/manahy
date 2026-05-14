@@ -48,15 +48,27 @@ func newDiskCreateCmd() *cobra.Command {
 }
 
 func newDiskRemoveCmd(configFile *string) *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	c := &cobra.Command{
 		Use:   "remove",
 		Short: "remove a virtual disk",
-		Args:  cobra.RangeArgs(1, 1),
+		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			path := resolveDisk(loadConfig(*configFile), args[0])
-			return hyperv.RemoveDisk(path, true)
+			prompt := fmt.Sprintf("Remove %d disk(s)?", len(args))
+			if !confirmAction(prompt, force) {
+				return nil
+			}
+			for _, arg := range args {
+				path := resolveDisk(loadConfig(*configFile), arg)
+				if err := hyperv.RemoveDisk(path, true); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	}
+	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return c
 }
 
 func newDiskInfoCmd(configFile *string) *cobra.Command {
