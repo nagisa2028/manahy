@@ -43,13 +43,13 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 		line = strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
 
 		switch state {
-		case "Running":
+		case vmStateRunning:
 			vmList.Running = append(vmList.Running, line)
-		case "Saved":
+		case vmStateSaved:
 			vmList.Saved = append(vmList.Saved, line)
-		case "Off":
+		case vmStateOff:
 			vmList.Off = append(vmList.Off, line)
-		case "Paused":
+		case vmStatePaused:
 			vmList.Paused = append(vmList.Paused, line)
 		default:
 			return vmList, fmt.Errorf("unknown VM state in output: %q", state)

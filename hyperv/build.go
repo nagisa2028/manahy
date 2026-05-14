@@ -19,7 +19,7 @@ func BuildByStruct(summarize Summarize) error {
 
 	for key, network := range summarize.Networks {
 		network.Name = key
-		if GetSwitchType(network.Name) == "NotFound" {
+		if GetSwitchType(network.Name) == vmStateNotFound {
 			if err := CreateSwitch(network, true); err != nil {
 				return err
 			}

@@ -4,13 +4,13 @@ package hyperv
 // Change to "pwsh" for PowerShell 7+.
 const psExecutable = "powershell"
 
-// File system
+// File system.
 const (
 	cmdTestPath   = "Test-Path"
 	cmdRemoveItem = "Remove-Item"
 )
 
-// VHD / disk
+// VHD / disk.
 const (
 	cmdNewVHD      = "New-VHD"
 	cmdGetVHD      = "Get-VHD"
@@ -22,7 +22,7 @@ const (
 	cmdMergeVHD    = "Merge-VHD"
 )
 
-// VM lifecycle
+// VM lifecycle.
 const (
 	cmdGetVM         = "Get-VM"
 	cmdNewVM         = "New-VM"
@@ -111,4 +111,28 @@ const (
 	cmdAddLocalGroupMember    = "Add-LocalGroupMember"
 	cmdRemoveLocalGroupMember = "Remove-LocalGroupMember"
 	hvAdminsGroup             = "Hyper-V Administrators"
+)
+
+// VM states returned by GetVMState.
+const (
+	vmStateNotFound = "NotFound"
+	vmStateUnknown  = "Unknown"
+	vmStateRunning  = "Running"
+	vmStatePaused   = "Paused"
+	vmStateOff      = "Off"
+	vmStateSaved    = "Saved"
+)
+
+// Virtual switch types.
+const (
+	switchTypeExternal = "external"
+	switchTypeInternal = "internal"
+	switchTypePrivate  = "private"
+)
+
+// Virtual disk types.
+const (
+	diskTypeDynamic      = "dynamic"
+	diskTypeFixed        = "fixed"
+	diskTypeDifferencing = "differencing"
 )

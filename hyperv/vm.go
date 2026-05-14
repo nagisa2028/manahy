@@ -22,21 +22,21 @@ func GetVMList() (VMList, error) {
 func GetVMState(name string) string {
 	res, err := outputPS(cmdGetVM + " " + ps(name) + " | Format-Table State")
 	if err != nil {
-		return "NotFound"
+		return vmStateNotFound
 	}
 	vmState := listingOfExecuteResults(res, "State")
 	if len(vmState) == 1 {
 		return vmState[0]
 	}
-	return "Unknown"
+	return vmStateUnknown
 }
 
 // IsVMExist returns an error if the VM does not exist.
 func IsVMExist(name string) error {
 	switch GetVMState(name) {
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of VM %s", name)
-	case "NotFound":
+	case vmStateNotFound:
 		return fmt.Errorf("VM %s does not exist", name)
 	}
 	return nil
@@ -45,9 +45,9 @@ func IsVMExist(name string) error {
 // IsNotVMExist returns an error if the VM already exists.
 func IsNotVMExist(name string) error {
 	switch GetVMState(name) {
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of VM %s", name)
-	case "NotFound":
+	case vmStateNotFound:
 		return nil
 	}
 	return fmt.Errorf("VM %s already exists", name)
@@ -122,9 +122,9 @@ func SetVMImageFile(name string, image string) error {
 func SetVMSwitch(name string, networks []string) error {
 	for _, network := range networks {
 		switch GetSwitchType(network) {
-		case "NotFound":
+		case vmStateNotFound:
 			return fmt.Errorf("switch %s does not exist", network)
-		case "Unknown":
+		case vmStateUnknown:
 			return fmt.Errorf("failed to get state of switch %s", network)
 		}
 
@@ -209,7 +209,7 @@ func RenameVM(name string, newName string) error {
 
 // ConnectVM opens a VM console connection.
 func ConnectVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdVMConnect + " localhost " + ps(name))
@@ -217,7 +217,7 @@ func ConnectVM(name string) error {
 
 // StartVM starts a VM.
 func StartVM(name string) error {
-	if GetVMState(name) == "Running" {
+	if GetVMState(name) == vmStateRunning {
 		return fmt.Errorf("VM %s is already running", name)
 	}
 	return runPS(cmdStartVM + " " + ps(name))
@@ -225,7 +225,7 @@ func StartVM(name string) error {
 
 // StopVM shuts down a VM gracefully.
 func StopVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdStopVM + " -Name " + ps(name))
@@ -233,7 +233,7 @@ func StopVM(name string) error {
 
 // DestroyVM force-stops a VM.
 func DestroyVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdStopVM + " -Force -Name " + ps(name))
@@ -241,7 +241,7 @@ func DestroyVM(name string) error {
 
 // SaveVM saves the state of a VM.
 func SaveVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdSaveVM + " -Name " + ps(name))
@@ -249,7 +249,7 @@ func SaveVM(name string) error {
 
 // SuspendVM pauses a VM.
 func SuspendVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdSuspendVM + " -Name " + ps(name))
@@ -257,7 +257,7 @@ func SuspendVM(name string) error {
 
 // RestartVM restarts a VM.
 func RestartVM(name string) error {
-	if GetVMState(name) != "Running" {
+	if GetVMState(name) != vmStateRunning {
 		return fmt.Errorf("VM %s is not running", name)
 	}
 	return runPS(cmdRestartVM + " -Name " + ps(name) + " -Force")
@@ -265,7 +265,7 @@ func RestartVM(name string) error {
 
 // ResumeVM resumes a paused VM.
 func ResumeVM(name string) error {
-	if GetVMState(name) != "Paused" {
+	if GetVMState(name) != vmStatePaused {
 		return fmt.Errorf("VM %s is not paused", name)
 	}
 	return runPS(cmdResumeVM + " -Name " + ps(name))

@@ -23,13 +23,13 @@ func CreateDisk(newDisk Disk, output bool) error {
 
 	cmd := cmdNewVHD + " -Path " + ps(newDisk.Path)
 	switch newDisk.Type {
-	case "dynamic":
+	case diskTypeDynamic:
 		cmd += " -SizeBytes " + newDisk.Size
-	case "fixed":
+	case diskTypeFixed:
 		cmd += " -SizeBytes " + newDisk.Size
 		cmd += " -SourceDisk " + strconv.Itoa(newDisk.SourceDisk)
 		cmd += " -Fixed"
-	case "differencing":
+	case diskTypeDifferencing:
 		cmd += " -ParentPath " + ps(newDisk.ParentPath)
 		cmd += " -Differencing"
 	}
@@ -60,7 +60,7 @@ func checkDiskParam(newDisk Disk) error {
 	if err := checkDiskType(newDisk.Type); err != nil {
 		return err
 	}
-	if newDisk.Type == "differencing" {
+	if newDisk.Type == diskTypeDifferencing {
 		if err := isFileExist(newDisk.ParentPath); err != nil {
 			return err
 		}
@@ -70,10 +70,10 @@ func checkDiskParam(newDisk Disk) error {
 
 func checkDiskType(diskType string) error {
 	switch diskType {
-	case "dynamic", "fixed", "differencing":
+	case diskTypeDynamic, diskTypeFixed, diskTypeDifferencing:
 		return nil
 	default:
-		return fmt.Errorf("undefined disk type: %s", diskType)
+		return fmt.Errorf("invalid disk type: %s", diskType)
 	}
 }
 

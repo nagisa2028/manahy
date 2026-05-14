@@ -36,7 +36,7 @@ func DryRunBuild(summarize Summarize, w io.Writer) {
 			dryRunLine(w, "network", name, "error", err.Error())
 			continue
 		}
-		if GetSwitchType(name) != "NotFound" {
+		if GetSwitchType(name) != vmStateNotFound {
 			dryRunLine(w, "network", name, "skip", "already exists")
 			continue
 		}
@@ -71,7 +71,7 @@ func DryRunBuild(summarize Summarize, w io.Writer) {
 			if count != 1 {
 				vmName = name + strconv.Itoa(i)
 			}
-			if GetVMState(vmName) != "NotFound" {
+			if GetVMState(vmName) != vmStateNotFound {
 				dryRunLine(w, "vm", vmName, "skip", "already exists")
 				continue
 			}
@@ -96,7 +96,7 @@ func DryRunRemove(summarize Summarize, w io.Writer) {
 				vmName = name + strconv.Itoa(i)
 			}
 			state := GetVMState(vmName)
-			if state == "NotFound" {
+			if state == vmStateNotFound {
 				dryRunLine(w, "vm", vmName, "skip", "not found")
 			} else {
 				dryRunLine(w, "vm", vmName, "remove", "state: "+state)
@@ -105,7 +105,7 @@ func DryRunRemove(summarize Summarize, w io.Writer) {
 	}
 
 	for name := range summarize.Networks {
-		if GetSwitchType(name) == "NotFound" {
+		if GetSwitchType(name) == vmStateNotFound {
 			dryRunLine(w, "network", name, "skip", "not found")
 		} else {
 			dryRunLine(w, "network", name, "remove", "")

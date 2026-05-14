@@ -19,21 +19,21 @@ func GetSwitchList() (SwitchList, error) {
 func GetSwitchType(name string) string {
 	res, err := outputPS(cmdGetVMSwitch + " " + ps(name) + " | Format-Table SwitchType")
 	if err != nil {
-		return "NotFound"
+		return vmStateNotFound
 	}
 	switchType := listingOfExecuteResults(res, "SwitchType")
 	if len(switchType) == 1 {
 		return switchType[0]
 	}
-	return "Unknown"
+	return vmStateUnknown
 }
 
 // IsSwitchExist returns an error if the switch does not exist.
 func IsSwitchExist(name string) error {
 	switch GetSwitchType(name) {
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of switch %s", name)
-	case "NotFound":
+	case vmStateNotFound:
 		return fmt.Errorf("switch %s does not exist", name)
 	}
 	return nil
@@ -42,9 +42,9 @@ func IsSwitchExist(name string) error {
 // IsNotSwitchExist returns an error if the switch already exists.
 func IsNotSwitchExist(name string) error {
 	switch GetSwitchType(name) {
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of switch %s", name)
-	case "NotFound":
+	case vmStateNotFound:
 		return nil
 	}
 	return fmt.Errorf("switch %s already exists", name)
@@ -59,7 +59,7 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 	}
 
 	cmd := cmdNewVMSwitch + " -name " + ps(newSwitch.Name)
-	if newSwitch.Type == "external" {
+	if newSwitch.Type == switchTypeExternal {
 		cmd += " -NetAdapterName " + ps(newSwitch.ExternalInterface)
 		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOS)
 	} else {
@@ -97,9 +97,9 @@ func RenameSwitch(name string, newName string) error {
 func ChangeSwitchType(name string, switchType string) error {
 	nameType := GetSwitchType(name)
 	switch nameType {
-	case "NotFound":
+	case vmStateNotFound:
 		return fmt.Errorf("switch %s does not exist", name)
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of switch %s", name)
 	}
 	if err := checkSwitchType(switchType); err != nil {
@@ -114,16 +114,16 @@ func ChangeSwitchType(name string, switchType string) error {
 // ChangeSwitchNetAdapter changes the net adapter of an external virtual switch.
 func ChangeSwitchNetAdapter(name string, netAdapter string) error {
 	switch GetSwitchType(name) {
-	case "NotFound":
+	case vmStateNotFound:
 		return fmt.Errorf("switch %s does not exist", name)
-	case "Unknown":
+	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of switch %s", name)
 	}
 	return runPS(cmdSetVMSwitch + " " + ps(name) + " -NetAdapterName " + ps(netAdapter))
 }
 
 func checkSwitchParam(newSwitch VMSwitch) error {
-	if GetSwitchType(newSwitch.Name) != "NotFound" {
+	if GetSwitchType(newSwitch.Name) != vmStateNotFound {
 		return fmt.Errorf("switch %s already exists", newSwitch.Name)
 	}
 	if err := checkSwitchType(newSwitch.Type); err != nil {
@@ -134,18 +134,18 @@ func checkSwitchParam(newSwitch VMSwitch) error {
 
 func checkSwitchType(switchType string) error {
 	switch switchType {
-	case "external", "internal", "private":
+	case switchTypeExternal, switchTypeInternal, switchTypePrivate:
 		return nil
 	default:
-		return fmt.Errorf("undefined switch type: %s", switchType)
+		return fmt.Errorf("invalid switch type: %s", switchType)
 	}
 }
 
 func checkSwitchIntegrity(switchType string, externalInterface string) error {
-	if switchType == "external" && externalInterface == "" {
+	if switchType == switchTypeExternal && externalInterface == "" {
 		return fmt.Errorf("external interface is required for external switches")
 	}
-	if switchType != "external" && externalInterface != "" {
+	if switchType != switchTypeExternal && externalInterface != "" {
 		return fmt.Errorf("external interface is only valid for external switches")
 	}
 	return nil

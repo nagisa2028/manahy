@@ -1,7 +1,7 @@
 // Package hyperv manages Hyper-V via PowerShell commands.
 package hyperv
 
-// VM is create vm option.
+// VM defines the configuration for creating a virtual machine.
 type VM struct {
 	Name       string   `yaml:"-"`
 	Count      int      `yaml:"count,omitempty"`
@@ -14,19 +14,19 @@ type VM struct {
 	Networks   []string `yaml:"networks"`
 }
 
-// CPU is set-processor option.
+// CPU defines the processor configuration for a virtual machine.
 type CPU struct {
 	Thread int  `yaml:"thread"`
 	Nested bool `yaml:"nested"`
 }
 
-// Memory is set memory option.
+// Memory defines the memory configuration for a virtual machine.
 type Memory struct {
 	Size    string `yaml:"size"`
 	Dynamic bool   `yaml:"dynamic"`
 }
 
-// Disk is create disk option.
+// Disk defines the configuration for creating a virtual hard disk.
 type Disk struct {
 	Path       string `yaml:"path"`
 	Size       string `yaml:"size,omitempty"`
@@ -36,7 +36,7 @@ type Disk struct {
 	Import     bool   `yaml:"import,omitempty"`
 }
 
-// VMSwitch is create switch option.
+// VMSwitch defines the configuration for creating a virtual switch.
 type VMSwitch struct {
 	Name              string `yaml:"-"`
 	Type              string `yaml:"type"`
@@ -44,14 +44,14 @@ type VMSwitch struct {
 	AllowManagementOS bool   `yaml:"allow-management-os,omitempty"`
 }
 
-// SwitchList is all type switch list.
+// SwitchList groups virtual switches by type.
 type SwitchList struct {
 	External []string
 	Internal []string
 	Private  []string
 }
 
-// VMList is all status vm list.
+// VMList groups virtual machines by state.
 type VMList struct {
 	Running []string
 	Saved   []string
