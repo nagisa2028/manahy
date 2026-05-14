@@ -12,7 +12,7 @@ func newVMDvdCmd(configFile *string) *cobra.Command {
 		Use:   "dvd",
 		Short: "manage VM DVD drives",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(

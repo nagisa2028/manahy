@@ -12,7 +12,7 @@ func newVMHardDiskCmd(configFile *string) *cobra.Command {
 		Use:   "disk",
 		Short: "manage VM hard disk drives",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(

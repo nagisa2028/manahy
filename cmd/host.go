@@ -12,7 +12,7 @@ func newHostCmd() *cobra.Command {
 		Use:   "host",
 		Short: "show Hyper-V host information",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("need valid command")
+			return fmt.Errorf("need a valid subcommand")
 		},
 	}
 	cmd.AddCommand(
