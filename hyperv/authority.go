@@ -1,9 +1,6 @@
 package hyperv
 
-import (
-	"fmt"
-	"regexp"
-)
+import "fmt"
 
 // GetGroupMember returns the list of Hyper-V Administrators group members.
 func GetGroupMember() ([]string, error) {
@@ -13,8 +10,7 @@ func GetGroupMember() ([]string, error) {
 	}
 
 	var members []string
-	lines := regexp.MustCompile("\r\n|\n").Split(string(res), -1)
-	for i, line := range lines {
+	for i, line := range reSplit.Split(string(res), -1) {
 		if i < 2 {
 			continue
 		}

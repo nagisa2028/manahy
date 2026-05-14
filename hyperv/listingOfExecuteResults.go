@@ -10,12 +10,22 @@ import (
 const reSplitLine = "\r\n|\n"
 const reBlankLine = "^[-\\s]*$"
 
+//nolint:gochecknoglobals
+var (
+	reSplit      = regexp.MustCompile(reSplitLine)
+	reBlank      = regexp.MustCompile(reBlankLine)
+	reDashOnly   = regexp.MustCompile("^-*$")
+	reVMState    = regexp.MustCompile("Running$|Saved$|Off$|Paused$")
+	reSwitchType = regexp.MustCompile("External$|Internal$|Private$")
+	reLeadNum    = regexp.MustCompile("^[0-9]+")
+	reTrailNum   = regexp.MustCompile("[0-9]+$")
+)
+
 func listingOfExecuteResults(res []byte, flag string) []string {
 	var list []string
-	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
-	for _, line := range split {
+	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.Trim(line, " ")
-		if line != flag && !regexp.MustCompile("^-*$").MatchString(line) && line != "" {
+		if line != flag && !reDashOnly.MatchString(line) && line != "" {
 			list = append(list, line)
 		}
 	}
@@ -24,14 +34,13 @@ func listingOfExecuteResults(res []byte, flag string) []string {
 
 func vmListingOfExecuteResults(res []byte) (VMList, error) {
 	var vmList VMList
-	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
-	for _, line := range split {
+	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || regexp.MustCompile(reBlankLine).MatchString(line) {
+		if strings.Contains(line, "Name") || reBlank.MatchString(line) {
 			continue
 		}
-		state := regexp.MustCompile("Running$|Saved$|Off$|Paused$").FindString(line)
-		line = strings.TrimSpace(regexp.MustCompile("Running$|Saved$|Off$|Paused$").ReplaceAllString(line, ""))
+		state := reVMState.FindString(line)
+		line = strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
 
 		switch state {
 		case "Running":
@@ -51,14 +60,13 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 
 func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 	var switchList SwitchList
-	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
-	for _, line := range split {
+	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || regexp.MustCompile(reBlankLine).MatchString(line) {
+		if strings.Contains(line, "Name") || reBlank.MatchString(line) {
 			continue
 		}
-		switchType := regexp.MustCompile("External$|Internal$|Private$").FindString(line)
-		line = strings.TrimSpace(regexp.MustCompile("External$|Internal$|Private$").ReplaceAllString(line, ""))
+		switchType := reSwitchType.FindString(line)
+		line = strings.TrimSpace(reSwitchType.ReplaceAllString(line, ""))
 
 		switch switchType {
 		case "External":
@@ -76,22 +84,21 @@ func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 
 func storageListingOfExecuteResults(res []byte) (StorageList, error) {
 	var storageList StorageList
-	split := regexp.MustCompile(reSplitLine).Split(string(res), -1)
-	for _, line := range split {
+	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Number") || regexp.MustCompile(reBlankLine).MatchString(line) {
+		if strings.Contains(line, "Number") || reBlank.MatchString(line) {
 			continue
 		}
-		storageList.Number = append(storageList.Number, regexp.MustCompile("^[0-9]+").FindString(line))
-		line = regexp.MustCompile("^[0-9]+").ReplaceAllString(line, "")
+		storageList.Number = append(storageList.Number, reLeadNum.FindString(line))
+		line = reLeadNum.ReplaceAllString(line, "")
 
-		capacity, unit, err := computeCapacity(regexp.MustCompile("[0-9]+$").FindString(line))
+		capacity, unit, err := computeCapacity(reTrailNum.FindString(line))
 		if err != nil {
 			return storageList, err
 		}
 		storageList.Size = append(storageList.Size, capacity)
 		storageList.SizeUnit = append(storageList.SizeUnit, unit)
-		line = strings.TrimSpace(regexp.MustCompile("[0-9]+$").ReplaceAllString(line, ""))
+		line = strings.TrimSpace(reTrailNum.ReplaceAllString(line, ""))
 		storageList.FriendlyName = append(storageList.FriendlyName, line)
 	}
 	return storageList, nil

@@ -6,6 +6,9 @@ import (
 	"strconv"
 )
 
+//nolint:gochecknoglobals
+var reDiskSize = regexp.MustCompile("^[0-9]*[TGM]B$")
+
 // CreateDisk creates a new virtual hard disk.
 func CreateDisk(newDisk Disk, output bool) error {
 	if newDisk.Import {
@@ -75,7 +78,7 @@ func checkDiskType(diskType string) error {
 }
 
 func checkDiskSize(diskSize string) error {
-	if regexp.MustCompile("^[0-9]*[TGM]B$").FindString(diskSize) == "" {
+	if reDiskSize.FindString(diskSize) == "" {
 		return fmt.Errorf("invalid disk size format: %s (expected e.g. 10GB)", diskSize)
 	}
 	return nil
@@ -101,7 +104,7 @@ func ResizeVHD(path, size string) error {
 	if err := checkDiskSize(size); err != nil {
 		return err
 	}
-	return runPS("Resize-VHD -Path " + ps(path) + " -SizeBytes " + size)
+	return runPSLong("Resize-VHD -Path " + ps(path) + " -SizeBytes " + size)
 }
 
 // OptimizeVHD compacts a VHD using full mode optimization.
@@ -109,7 +112,7 @@ func OptimizeVHD(path string) error {
 	if err := isFileExist(path); err != nil {
 		return err
 	}
-	return runPS("Optimize-VHD -Path " + ps(path) + " -Mode Full")
+	return runPSLong("Optimize-VHD -Path " + ps(path) + " -Mode Full")
 }
 
 // ConvertVHD converts a VHD to a new format at the destination path.
@@ -121,7 +124,7 @@ func ConvertVHD(path, destPath, diskType string) error {
 	if diskType != "" {
 		cmd += " -VHDType " + ps(diskType)
 	}
-	return runPS(cmd)
+	return runPSLong(cmd)
 }
 
 // MountVHD mounts a VHD.
@@ -149,5 +152,5 @@ func MergeVHD(path, destPath string) error {
 	if destPath != "" {
 		cmd += " -DestinationPath " + ps(destPath)
 	}
-	return runPS(cmd)
+	return runPSLong(cmd)
 }

@@ -7,15 +7,13 @@ func GetVMInfo(name string) (string, error) {
 	if err := IsVMExist(name); err != nil {
 		return "", err
 	}
-	procOut, err := outputPS("Get-VMProcessor -VMName " + ps(name) + " | Format-List VMName, Count, ExposeVirtualizationExtensions")
+	script := "Get-VMProcessor -VMName " + ps(name) + " | Format-List VMName, Count, ExposeVirtualizationExtensions; " +
+		"Get-VMMemory -VMName " + ps(name) + " | Format-List VMName, DynamicMemoryEnabled, Startup, Minimum, Maximum, Buffer, Priority"
+	out, err := outputPS(script)
 	if err != nil {
-		return "", fmt.Errorf("failed to get processor info for VM %s", name)
+		return "", fmt.Errorf("failed to get info for VM %s", name)
 	}
-	memOut, err := outputPS("Get-VMMemory -VMName " + ps(name) + " | Format-List VMName, DynamicMemoryEnabled, Startup, Minimum, Maximum, Buffer, Priority")
-	if err != nil {
-		return "", fmt.Errorf("failed to get memory info for VM %s", name)
-	}
-	return string(procOut) + string(memOut), nil
+	return string(out), nil
 }
 
 // MeasureVM returns resource usage metrics for a VM.

@@ -81,13 +81,11 @@ func newDiskResizeCmd() *cobra.Command {
 		Short: "resize a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if size == "" {
-				return fmt.Errorf("--size is required")
-			}
 			return hyperv.ResizeVHD(args[0], size)
 		},
 	}
 	c.Flags().StringVarP(&size, "size", "s", "", "new size (e.g. 20GB)")
+	_ = c.MarkFlagRequired("size")
 	return c
 }
 
@@ -109,14 +107,12 @@ func newDiskConvertCmd() *cobra.Command {
 		Short: "convert a VHD",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if dest == "" {
-				return fmt.Errorf("--dest is required")
-			}
 			return hyperv.ConvertVHD(args[0], dest, diskType)
 		},
 	}
 	c.Flags().StringVarP(&dest, "dest", "d", "", "destination path")
 	c.Flags().StringVarP(&diskType, "type", "t", "", "disk type (Dynamic or Fixed)")
+	_ = c.MarkFlagRequired("dest")
 	return c
 }
 

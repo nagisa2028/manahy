@@ -62,13 +62,11 @@ func newVMNicRemoveCmd() *cobra.Command {
 		Short: "remove a network adapter from a VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			return hyperv.RemoveVMNetworkAdapter(args[0], name)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "adapter name")
+	_ = c.MarkFlagRequired("name")
 	return c
 }
 
@@ -79,16 +77,12 @@ func newVMNicConnectCmd() *cobra.Command {
 		Short: "connect a network adapter to a switch",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-			if switchName == "" {
-				return fmt.Errorf("--switch is required")
-			}
 			return hyperv.ConnectVMNetworkAdapter(args[0], name, switchName)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "adapter name")
 	c.Flags().StringVarP(&switchName, "switch", "s", "", "switch name")
+	_ = c.MarkFlagRequired("name")
+	_ = c.MarkFlagRequired("switch")
 	return c
 }

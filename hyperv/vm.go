@@ -272,12 +272,12 @@ func ExportVM(name, path string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return runPS("Export-VM -Name " + ps(name) + " -Path " + ps(path))
+	return runPSLong("Export-VM -Name " + ps(name) + " -Path " + ps(path))
 }
 
 // ImportVM registers a VM from a .vmcx file path.
 func ImportVM(path string) error {
-	return runPS("Import-VM -Path " + ps(path))
+	return runPSLong("Import-VM -Path " + ps(path))
 }
 
 // MoveVMStorage moves all VM storage files to a new directory on the same host.
@@ -285,7 +285,7 @@ func MoveVMStorage(name, destPath string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return runPS("Move-VMStorage -VMName " + ps(name) + " -DestinationStoragePath " + ps(destPath))
+	return runPSLong("Move-VMStorage -VMName " + ps(name) + " -DestinationStoragePath " + ps(destPath))
 }
 
 // CopyVM exports the source VM then imports it as a new VM with a different name.
@@ -301,7 +301,7 @@ func CopyVM(name, newName, destPath string) error {
 		"$vmcx = (Get-ChildItem -Recurse -Path " + ps(destPath+"\\"+name) + " -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
 		"$newVM = Import-VM -Path $vmcx -Copy -GenerateNewId; " +
 		"Rename-VM -VM $newVM -NewName " + ps(newName)
-	return runPS(script)
+	return runPSLong(script)
 }
 
 func checkVMParam(newVM VM) error {

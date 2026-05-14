@@ -151,13 +151,11 @@ func newVMRenameCmd() *cobra.Command {
 		Short: "rename VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if newName == "" {
-				return fmt.Errorf("--new-name is required")
-			}
 			return hyperv.RenameVM(args[0], newName)
 		},
 	}
 	c.Flags().StringVarP(&newName, "new-name", "n", "", "new vm name")
+	_ = c.MarkFlagRequired("new-name")
 	return c
 }
 
@@ -296,13 +294,11 @@ func newVMExportCmd() *cobra.Command {
 		Short: "export VM to a directory",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
 			return hyperv.ExportVM(args[0], path)
 		},
 	}
 	c.Flags().StringVarP(&path, "path", "p", "", "export destination directory")
+	_ = c.MarkFlagRequired("path")
 	return c
 }
 
@@ -324,13 +320,11 @@ func newVMMoveCmd() *cobra.Command {
 		Short: "move VM storage to another directory",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
 			return hyperv.MoveVMStorage(args[0], path)
 		},
 	}
 	c.Flags().StringVarP(&path, "path", "p", "", "destination storage directory")
+	_ = c.MarkFlagRequired("path")
 	return c
 }
 
@@ -341,17 +335,13 @@ func newVMCopyCmd() *cobra.Command {
 		Short: "copy VM with a new name",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if newName == "" {
-				return fmt.Errorf("--new-name is required")
-			}
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
 			return hyperv.CopyVM(args[0], newName, path)
 		},
 	}
 	c.Flags().StringVarP(&newName, "new-name", "n", "", "new vm name")
 	c.Flags().StringVarP(&path, "path", "p", "", "directory for exported source files")
+	_ = c.MarkFlagRequired("new-name")
+	_ = c.MarkFlagRequired("path")
 	return c
 }
 

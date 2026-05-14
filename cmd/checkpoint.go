@@ -63,13 +63,11 @@ func newCheckpointRestoreCmd() *cobra.Command {
 		Short: "restore a VM to a checkpoint",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			return hyperv.RestoreCheckpoint(args[0], name)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	_ = c.MarkFlagRequired("name")
 	return c
 }
 
@@ -80,13 +78,11 @@ func newCheckpointRemoveCmd() *cobra.Command {
 		Short: "delete a checkpoint from a VM",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			return hyperv.RemoveCheckpoint(args[0], name)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
+	_ = c.MarkFlagRequired("name")
 	return c
 }
 
@@ -97,17 +93,13 @@ func newCheckpointRenameCmd() *cobra.Command {
 		Short: "rename a checkpoint",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-			if newName == "" {
-				return fmt.Errorf("--new-name is required")
-			}
 			return hyperv.RenameCheckpoint(args[0], name, newName)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
 	c.Flags().StringVarP(&newName, "new-name", "", "", "new checkpoint name")
+	_ = c.MarkFlagRequired("name")
+	_ = c.MarkFlagRequired("new-name")
 	return c
 }
 
@@ -118,16 +110,12 @@ func newCheckpointExportCmd() *cobra.Command {
 		Short: "export a checkpoint to a directory",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-			if path == "" {
-				return fmt.Errorf("--path is required")
-			}
 			return hyperv.ExportCheckpoint(args[0], name, path)
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "checkpoint name")
 	c.Flags().StringVarP(&path, "path", "p", "", "export destination directory")
+	_ = c.MarkFlagRequired("name")
+	_ = c.MarkFlagRequired("path")
 	return c
 }

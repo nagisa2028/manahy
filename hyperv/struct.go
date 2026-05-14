@@ -41,7 +41,7 @@ type VMSwitch struct {
 	Name              string `yaml:"name"`
 	Type              string `yaml:"type"`
 	ExternalInterface string `yaml:"external-interface,omitempty"`
-	AllowManagementOs bool   `yaml:"allow-management-os,omitempty"`
+	AllowManagementOS bool   `yaml:"allow-management-os,omitempty"`
 }
 
 // SwitchList is all type switch list.

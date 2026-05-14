@@ -82,7 +82,7 @@ func newSwitchCreateCmd() *cobra.Command {
 	c.Flags().StringVarP(&opt.Name, "name", "n", "", "set name")
 	c.Flags().StringVarP(&opt.Type, "type", "t", "", "set type")
 	c.Flags().StringVarP(&opt.ExternalInterface, "external-interface", "", "", "set external interface")
-	c.Flags().BoolVarP(&opt.AllowManagementOs, "allow-management-os", "", false, "set allow management os")
+	c.Flags().BoolVarP(&opt.AllowManagementOS, "allow-management-os", "", false, "set allow management os")
 	return c
 }
 
@@ -104,13 +104,11 @@ func newSwitchRenameCmd() *cobra.Command {
 		Short: "Rename switch",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if newName == "" {
-				return fmt.Errorf("--new-name is required")
-			}
 			return hyperv.RenameSwitch(args[0], newName)
 		},
 	}
 	c.Flags().StringVarP(&newName, "new-name", "n", "", "rename switch")
+	_ = c.MarkFlagRequired("new-name")
 	return c
 }
 
