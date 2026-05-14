@@ -10,10 +10,15 @@ import (
 func DryRunBuild(summarize Summarize, w io.Writer) {
 	_, _ = fmt.Fprintln(w, "[dry-run] build")
 
+	multiRefs := multiCountDiskRefs(summarize)
+
 	for name, disk := range summarize.Disks {
 		if disk.Import {
 			dryRunLine(w, "disk", name, "skip", "import: true")
 			continue
+		}
+		if multiRefs[name] {
+			continue // shown per-VM instance below
 		}
 		if err := checkDiskType(disk.Type); err != nil {
 			dryRunLine(w, "disk", name, "error", err.Error())
@@ -75,6 +80,20 @@ func DryRunBuild(summarize Summarize, w io.Writer) {
 				dryRunLine(w, "vm", vmName, "skip", "already exists")
 				continue
 			}
+			// For count>1, show what numbered disk copies would be created.
+			if count > 1 {
+				for _, ref := range vm.Disks {
+					if disk, ok := summarize.Disks[ref]; ok && !disk.Import {
+						numberedPath := numberPath(disk.Path, i)
+						label := ref + strconv.Itoa(i)
+						if isNotFileExist(numberedPath) != nil {
+							dryRunLine(w, "disk", label, "skip", "already exists: "+numberedPath)
+						} else {
+							dryRunLine(w, "disk", label, "create", numberedPath+" ("+disk.Size+", "+disk.Type+")")
+						}
+					}
+				}
+			}
 			detail := fmt.Sprintf("gen%d, %s, %d vCPU", vm.Generation, vm.Memory.Size, vm.CPU.Thread)
 			dryRunLine(w, "vm", vmName, "create", detail)
 		}
@@ -112,9 +131,24 @@ func DryRunRemove(summarize Summarize, w io.Writer) {
 		}
 	}
 
+	multiRefs := multiCountDiskRefs(summarize)
 	for name, disk := range summarize.Disks {
 		if disk.Import {
 			dryRunLine(w, "disk", name, "skip", "import: true")
+			continue
+		}
+		if multiRefs[name] {
+			// Show numbered copies that would be removed.
+			count := maxCountForDiskRef(summarize, name)
+			for i := 1; i <= count; i++ {
+				numberedPath := numberPath(disk.Path, i)
+				label := name + strconv.Itoa(i)
+				if isFileExist(numberedPath) != nil {
+					dryRunLine(w, "disk", label, "skip", "not found: "+numberedPath)
+				} else {
+					dryRunLine(w, "disk", label, "remove", numberedPath)
+				}
+			}
 			continue
 		}
 		if isFileExist(disk.Path) != nil {
