@@ -7,7 +7,7 @@ func GetVMDvdDrives(vmName string) (string, error) {
 	if err := IsVMExist(vmName); err != nil {
 		return "", err
 	}
-	res, err := outputPS("Get-VMDvdDrive -VMName " + ps(vmName) + " | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String")
+	res, err := outputPS(cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Format-Table VMName, ControllerType, ControllerNumber, ControllerLocation, Path | Out-String")
 	if err != nil {
 		return "", fmt.Errorf("failed to get DVD drives for VM %s", vmName)
 	}
@@ -19,7 +19,7 @@ func AddVMDvdDrive(vmName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Add-VMDvdDrive -VMName " + ps(vmName))
+	return runPS(cmdAddVMDvdDrive + " -VMName " + ps(vmName))
 }
 
 // RemoveVMDvdDrive removes the first DVD drive from a VM.
@@ -27,7 +27,7 @@ func RemoveVMDvdDrive(vmName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Get-VMDvdDrive -VMName " + ps(vmName) + " | Select-Object -First 1 | Remove-VMDvdDrive")
+	return runPS(cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Select-Object -First 1 | " + cmdRemoveVMDvdDrive)
 }
 
 // SetVMDvdDrive sets the ISO image path on the first DVD drive of a VM.
@@ -40,8 +40,8 @@ func SetVMDvdDrive(vmName, imagePath string) error {
 	if imagePath != "" {
 		pathParam = ps(imagePath)
 	}
-	script := "$dvd = Get-VMDvdDrive -VMName " + ps(vmName) + " | Select-Object -First 1; " +
-		"Set-VMDvdDrive -VMName " + ps(vmName) + " -ControllerNumber $dvd.ControllerNumber " +
+	script := "$dvd = " + cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Select-Object -First 1; " +
+		cmdSetVMDvdDrive + " -VMName " + ps(vmName) + " -ControllerNumber $dvd.ControllerNumber " +
 		"-ControllerLocation $dvd.ControllerLocation -Path " + pathParam
 	return runPS(script)
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func searchFilePath(path string) (bool, error) {
-	res, e := outputPS("Test-Path " + ps(path))
+	res, e := outputPS(cmdTestPath + " " + ps(path))
 	if e != nil {
 		return false, fmt.Errorf("failed to execute Test-Path")
 	}

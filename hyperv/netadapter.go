@@ -7,7 +7,7 @@ func GetVMNetworkAdapters(vmName string) (string, error) {
 	if err := IsVMExist(vmName); err != nil {
 		return "", err
 	}
-	res, err := outputPS("Get-VMNetworkAdapter -VMName " + ps(vmName) + " | Format-Table Name, SwitchName, MacAddress, Status | Out-String")
+	res, err := outputPS(cmdGetVMNetworkAdapter + " -VMName " + ps(vmName) + " | Format-Table Name, SwitchName, MacAddress, Status | Out-String")
 	if err != nil {
 		return "", fmt.Errorf("failed to get network adapters for VM %s", vmName)
 	}
@@ -19,7 +19,7 @@ func AddVMNetworkAdapter(vmName, name, switchName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	cmd := "Add-VMNetworkAdapter -VMName " + ps(vmName)
+	cmd := cmdAddVMNetworkAdapter + " -VMName " + ps(vmName)
 	if name != "" {
 		cmd += " -Name " + ps(name)
 	}
@@ -34,7 +34,7 @@ func RemoveVMNetworkAdapter(vmName, name string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Remove-VMNetworkAdapter -VMName " + ps(vmName) + " -Name " + ps(name))
+	return runPS(cmdRemoveVMNetworkAdapter + " -VMName " + ps(vmName) + " -Name " + ps(name))
 }
 
 // ConnectVMNetworkAdapter connects a VM network adapter to a virtual switch.
@@ -42,5 +42,5 @@ func ConnectVMNetworkAdapter(vmName, name, switchName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Connect-VMNetworkAdapter -VMName " + ps(vmName) + " -Name " + ps(name) + " -SwitchName " + ps(switchName))
+	return runPS(cmdConnectVMNetworkAdapter + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -SwitchName " + ps(switchName))
 }

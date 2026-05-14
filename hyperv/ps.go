@@ -35,7 +35,7 @@ func runPS(cmd string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), psTimeout)
 	defer cancel()
-	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Run()
+	return exec.CommandContext(ctx, psExecutable, "-NoProfile", cmd).Run()
 }
 
 // outputPS executes a PowerShell command string and returns its output.
@@ -45,7 +45,7 @@ func outputPS(cmd string) ([]byte, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), psTimeout)
 	defer cancel()
-	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Output()
+	return exec.CommandContext(ctx, psExecutable, "-NoProfile", cmd).Output()
 }
 
 // runPSLong executes a PowerShell command with a 10-minute timeout for long-running
@@ -56,5 +56,5 @@ func runPSLong(cmd string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), psLongTimeout)
 	defer cancel()
-	return exec.CommandContext(ctx, "powershell", "-NoProfile", cmd).Run()
+	return exec.CommandContext(ctx, psExecutable, "-NoProfile", cmd).Run()
 }

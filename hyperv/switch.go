@@ -8,7 +8,7 @@ import (
 
 // GetSwitchList returns a list of all virtual switches grouped by type.
 func GetSwitchList() (SwitchList, error) {
-	res, err := outputPS("Get-VMSwitch | Sort-Object SwitchType | Format-Table Name, SwitchType")
+	res, err := outputPS(cmdGetVMSwitch + " | Sort-Object SwitchType | Format-Table Name, SwitchType")
 	if err != nil {
 		return SwitchList{}, err
 	}
@@ -17,7 +17,7 @@ func GetSwitchList() (SwitchList, error) {
 
 // GetSwitchType returns the type of a virtual switch, or "NotFound" / "Unknown".
 func GetSwitchType(name string) string {
-	res, err := outputPS("Get-VMSwitch " + ps(name) + " | Format-Table SwitchType")
+	res, err := outputPS(cmdGetVMSwitch + " " + ps(name) + " | Format-Table SwitchType")
 	if err != nil {
 		return "NotFound"
 	}
@@ -58,7 +58,7 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 		return err
 	}
 
-	cmd := "New-VMSwitch -name " + ps(newSwitch.Name)
+	cmd := cmdNewVMSwitch + " -name " + ps(newSwitch.Name)
 	if newSwitch.Type == "external" {
 		cmd += " -NetAdapterName " + ps(newSwitch.ExternalInterface)
 		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOS)
@@ -79,7 +79,7 @@ func RemoveSwitch(name string) error {
 	if err := IsSwitchExist(name); err != nil {
 		return err
 	}
-	return runPS("Remove-VMSwitch " + ps(name) + " -Force")
+	return runPS(cmdRemoveVMSwitch + " " + ps(name) + " -Force")
 }
 
 // RenameSwitch renames a virtual switch.
@@ -90,7 +90,7 @@ func RenameSwitch(name string, newName string) error {
 	if err := IsNotSwitchExist(newName); err != nil {
 		return err
 	}
-	return runPS("Rename-VMSwitch " + ps(name) + " -NewName " + ps(newName))
+	return runPS(cmdRenameVMSwitch + " " + ps(name) + " -NewName " + ps(newName))
 }
 
 // ChangeSwitchType changes the type of a virtual switch.
@@ -108,7 +108,7 @@ func ChangeSwitchType(name string, switchType string) error {
 	if strings.EqualFold(nameType, switchType) {
 		return fmt.Errorf("switch %s is already of type %s", name, switchType)
 	}
-	return runPS("Set-VMSwitch " + ps(name) + " -SwitchType " + switchType)
+	return runPS(cmdSetVMSwitch + " " + ps(name) + " -SwitchType " + switchType)
 }
 
 // ChangeSwitchNetAdapter changes the net adapter of an external virtual switch.
@@ -119,7 +119,7 @@ func ChangeSwitchNetAdapter(name string, netAdapter string) error {
 	case "Unknown":
 		return fmt.Errorf("failed to get state of switch %s", name)
 	}
-	return runPS("Set-VMSwitch " + ps(name) + " -NetAdapterName " + ps(netAdapter))
+	return runPS(cmdSetVMSwitch + " " + ps(name) + " -NetAdapterName " + ps(netAdapter))
 }
 
 func checkSwitchParam(newSwitch VMSwitch) error {

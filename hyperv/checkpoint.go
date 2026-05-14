@@ -7,7 +7,7 @@ func CreateCheckpoint(vmName, name string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	cmd := "Checkpoint-VM -Name " + ps(vmName)
+	cmd := cmdCheckpointVM + " -Name " + ps(vmName)
 	if name != "" {
 		cmd += " -SnapshotName " + ps(name)
 	}
@@ -19,7 +19,7 @@ func GetCheckpoints(vmName string) (string, error) {
 	if err := IsVMExist(vmName); err != nil {
 		return "", err
 	}
-	out, err := outputPS("Get-VMCheckpoint -VMName " + ps(vmName) + " | Sort-Object CreationTime | Format-Table Name, CreationTime | Out-String")
+	out, err := outputPS(cmdGetVMCheckpoint + " -VMName " + ps(vmName) + " | Sort-Object CreationTime | Format-Table Name, CreationTime | Out-String")
 	if err != nil {
 		return "", fmt.Errorf("failed to get checkpoints for VM %s", vmName)
 	}
@@ -31,7 +31,7 @@ func RestoreCheckpoint(vmName, name string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Restore-VMCheckpoint -VMName " + ps(vmName) + " -Name " + ps(name) + " -Confirm:$false")
+	return runPS(cmdRestoreVMCheckpoint + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -Confirm:$false")
 }
 
 // RemoveCheckpoint deletes a checkpoint from a VM.
@@ -39,7 +39,7 @@ func RemoveCheckpoint(vmName, name string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Remove-VMCheckpoint -VMName " + ps(vmName) + " -Name " + ps(name) + " -Confirm:$false")
+	return runPS(cmdRemoveVMCheckpoint + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -Confirm:$false")
 }
 
 // RenameCheckpoint renames an existing checkpoint.
@@ -47,7 +47,7 @@ func RenameCheckpoint(vmName, name, newName string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Rename-VMCheckpoint -VMName " + ps(vmName) + " -Name " + ps(name) + " -NewName " + ps(newName))
+	return runPS(cmdRenameVMCheckpoint + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -NewName " + ps(newName))
 }
 
 // ExportCheckpoint exports a checkpoint to the specified path.
@@ -55,5 +55,5 @@ func ExportCheckpoint(vmName, name, path string) error {
 	if err := IsVMExist(vmName); err != nil {
 		return err
 	}
-	return runPS("Export-VMCheckpoint -VMName " + ps(vmName) + " -Name " + ps(name) + " -Path " + ps(path))
+	return runPS(cmdExportVMCheckpoint + " -VMName " + ps(vmName) + " -Name " + ps(name) + " -Path " + ps(path))
 }
