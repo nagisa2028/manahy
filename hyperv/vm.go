@@ -349,6 +349,9 @@ func checkVMParam(newVM VM) error {
 		return err
 	}
 	if newVM.Image != "" {
+		if !isWindowsAbsPath(newVM.Image) {
+			return fmt.Errorf("image path must be absolute: %s", newVM.Image)
+		}
 		return isFileExist(newVM.Image)
 	}
 	return nil
@@ -362,6 +365,9 @@ func checkVMGeneration(generation int) error {
 }
 
 func checkVMPath(name string, path string) error {
+	if !isWindowsAbsPath(path) {
+		return fmt.Errorf("VM path must be absolute: %s", path)
+	}
 	return isNotFileExist(path + "\\" + name)
 }
 

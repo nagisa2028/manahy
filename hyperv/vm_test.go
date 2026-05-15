@@ -363,6 +363,26 @@ func TestSetVMSwitch(t *testing.T) {
 
 // ---------- CreateVM ----------
 
+func TestCheckVMPath(t *testing.T) {
+	t.Run("relative path returns error without PS call", func(t *testing.T) {
+		outputCalled := false
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			outputCalled = true
+			return []byte("False\n"), nil
+		})
+		err := checkVMPath("my-vm", `VMs`)
+		if err == nil {
+			t.Fatal("checkVMPath: expected error for relative path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("checkVMPath: error %q does not contain 'absolute'", err.Error())
+		}
+		if outputCalled {
+			t.Error("checkVMPath: PS should not be called for relative path")
+		}
+	})
+}
+
 func TestCreateVM(t *testing.T) {
 	// makeCreateMock returns an outputPS mock for the minimal VM creation sequence:
 	// call 1: IsNotVMExist (Get-VM) → not found

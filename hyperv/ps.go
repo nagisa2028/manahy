@@ -27,6 +27,17 @@ var (
 // SetVerbose enables or disables printing each PowerShell command to stderr before execution.
 func SetVerbose(v bool) { psVerbose = v }
 
+// isWindowsAbsPath reports whether path is an absolute Windows path.
+// Recognises drive-letter paths (C:\...) and UNC paths (\\server\share).
+// Using a dedicated function instead of filepath.IsAbs ensures correct
+// behaviour when tests run on non-Windows hosts.
+func isWindowsAbsPath(path string) bool {
+	if strings.HasPrefix(path, `\\`) {
+		return true
+	}
+	return len(path) >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')
+}
+
 // ps returns s as a PowerShell single-quoted string literal.
 // Single quotes within s are escaped by doubling them, preventing injection
 // when user-controlled values are embedded in PowerShell commands.

@@ -367,6 +367,16 @@ func TestConvertVHD(t *testing.T) {
 // ---------- checkDiskParam ----------
 
 func TestCheckDiskParam(t *testing.T) {
+	t.Run("relative disk path returns error", func(t *testing.T) {
+		err := checkDiskParam(Disk{Path: `router1.vhd`, Type: "dynamic", Size: "10GB"})
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for relative path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("checkDiskParam: error %q does not contain 'absolute'", err.Error())
+		}
+	})
+
 	t.Run("import disk path not found returns error", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte("False\n"), nil // Test-Path: import file missing
@@ -400,6 +410,20 @@ func TestCheckDiskParam(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "invalid disk type") {
 			t.Errorf("checkDiskParam: error %q does not contain 'invalid disk type'", err.Error())
+		}
+	})
+
+	t.Run("differencing disk with relative parent path returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: child path free
+		})
+		disk := Disk{Path: `C:\VMs\child.vhd`, Type: "differencing", ParentPath: `parent.vhd`}
+		err := checkDiskParam(disk)
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for relative parent path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("checkDiskParam: error %q does not contain 'absolute'", err.Error())
 		}
 	})
 
