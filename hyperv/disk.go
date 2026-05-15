@@ -67,6 +67,7 @@ func checkDiskParam(newDisk Disk) error {
 		if err := isFileExist(newDisk.ParentPath); err != nil {
 			return err
 		}
+		return nil // differencing disks inherit size from parent
 	}
 	return checkDiskSize(newDisk.Size)
 }

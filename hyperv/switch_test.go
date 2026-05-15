@@ -392,3 +392,76 @@ func TestChangeSwitchType(t *testing.T) {
 		}
 	})
 }
+
+// ---------- CreateSwitch ----------
+
+func TestCreateSwitch(t *testing.T) {
+	t.Run("internal switch calls runPS and returns nil", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				return nil, errors.New("not found") // IsNotSwitchExist: switch free
+			},
+		)
+		if err := CreateSwitch(VMSwitch{Name: "mySwitch", Type: "internal"}, false); err != nil {
+			t.Fatalf("CreateSwitch: expected nil, got %v", err)
+		}
+		if !runCalled {
+			t.Error("CreateSwitch: runPS was not called")
+		}
+	})
+
+	t.Run("switch already exists returns error from param check", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("SwitchType\n----------\nInternal\n"), nil // already exists
+		})
+		err := CreateSwitch(VMSwitch{Name: "existing", Type: "internal"}, false)
+		if err == nil {
+			t.Fatal("CreateSwitch: expected error for existing switch, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("CreateSwitch: error %q does not contain 'already exists'", err.Error())
+		}
+	})
+
+	t.Run("invalid switch type returns error from param check", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found") // IsNotSwitchExist: switch free
+		})
+		err := CreateSwitch(VMSwitch{Name: "mySwitch", Type: "invalid"}, false)
+		if err == nil {
+			t.Fatal("CreateSwitch: expected error for invalid type, got nil")
+		}
+		if !strings.Contains(err.Error(), "invalid switch type") {
+			t.Errorf("CreateSwitch: error %q does not contain 'invalid switch type'", err.Error())
+		}
+	})
+
+	t.Run("external switch without interface returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := CreateSwitch(VMSwitch{Name: "extSwitch", Type: "external"}, false)
+		if err == nil {
+			t.Fatal("CreateSwitch: expected error for external switch without interface, got nil")
+		}
+		if !strings.Contains(err.Error(), "required") {
+			t.Errorf("CreateSwitch: error %q does not contain 'required'", err.Error())
+		}
+	})
+
+	t.Run("runPS error returns wrapped error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("ps error") },
+			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+		)
+		err := CreateSwitch(VMSwitch{Name: "mySwitch", Type: "private"}, false)
+		if err == nil {
+			t.Fatal("CreateSwitch: expected error from runPS, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to create switch") {
+			t.Errorf("CreateSwitch: error %q does not contain 'failed to create switch'", err.Error())
+		}
+	})
+}

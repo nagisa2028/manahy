@@ -184,10 +184,12 @@ func CreateVM(newVM VM, output bool) error {
 		return err
 	}
 
-	err = SetVMImageFile(newVM.Name, newVM.Image)
-	printError("Set Image File", err, output)
-	if err != nil {
-		return err
+	if newVM.Image != "" {
+		err = SetVMImageFile(newVM.Name, newVM.Image)
+		printError("Set Image File", err, output)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = SetVMSwitch(newVM.Name, newVM.Networks)

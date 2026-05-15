@@ -1,6 +1,7 @@
 package hyperv
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -46,6 +47,8 @@ func TestCheckDiskSize(t *testing.T) {
 		{"100 no unit", "100", true},
 		{"empty", "", true},
 		{"10gb lowercase", "10gb", true},
+		{"64TB at limit", "64TB", false},
+		{"65TB exceeds limit", "65TB", true},
 	}
 
 	for _, tc := range tests {
@@ -357,6 +360,141 @@ func TestConvertVHD(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "does not exist") {
 			t.Errorf("ConvertVHD: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
+// ---------- checkDiskParam ----------
+
+func TestCheckDiskParam(t *testing.T) {
+	t.Run("import disk path not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // Test-Path: import file missing
+		})
+		err := checkDiskParam(Disk{Path: `C:\missing.vhd`, Import: true})
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for missing import disk, got nil")
+		}
+	})
+
+	t.Run("non-import disk already exists returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil // Test-Path: file already exists
+		})
+		err := checkDiskParam(Disk{Path: `C:\existing.vhd`, Type: "dynamic", Size: "10GB"})
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for existing non-import disk, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("checkDiskParam: error %q does not contain 'already exists'", err.Error())
+		}
+	})
+
+	t.Run("invalid disk type returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: path free
+		})
+		err := checkDiskParam(Disk{Path: `C:\new.vhd`, Type: "invalid", Size: "10GB"})
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for invalid disk type, got nil")
+		}
+		if !strings.Contains(err.Error(), "invalid disk type") {
+			t.Errorf("checkDiskParam: error %q does not contain 'invalid disk type'", err.Error())
+		}
+	})
+
+	t.Run("differencing disk with missing parent returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return []byte("False\n"), nil // isNotFileExist: child path free
+			}
+			return []byte("False\n"), nil // isFileExist: parent missing
+		})
+		disk := Disk{Path: `C:\child.vhd`, Type: "differencing", ParentPath: `C:\missing-parent.vhd`}
+		err := checkDiskParam(disk)
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for missing parent, got nil")
+		}
+	})
+
+	t.Run("valid dynamic disk returns nil", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: path free
+		})
+		disk := Disk{Path: `C:\new.vhd`, Type: "dynamic", Size: "10GB"}
+		if err := checkDiskParam(disk); err != nil {
+			t.Fatalf("checkDiskParam: expected nil, got %v", err)
+		}
+	})
+}
+
+// ---------- CreateDisk ----------
+
+func TestCreateDisk(t *testing.T) {
+	t.Run("import disk returns nil immediately without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t, func(_ string) error { runCalled = true; return nil }, nil)
+		if err := CreateDisk(Disk{Import: true}, false); err != nil {
+			t.Fatalf("CreateDisk: expected nil for import, got %v", err)
+		}
+		if runCalled {
+			t.Error("CreateDisk: runPS called for import disk")
+		}
+	})
+
+	t.Run("dynamic disk command contains path and size", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return []byte("False\n"), nil },
+		)
+		disk := Disk{Path: `C:\new.vhd`, Type: "dynamic", Size: "20GB"}
+		if err := CreateDisk(disk, false); err != nil {
+			t.Fatalf("CreateDisk: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, `C:\new.vhd`) {
+			t.Errorf("CreateDisk: command %q does not contain path", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "20GB") {
+			t.Errorf("CreateDisk: command %q does not contain '20GB'", capturedCmd)
+		}
+	})
+
+	t.Run("differencing disk command contains -Differencing and ParentPath", func(t *testing.T) {
+		var capturedCmd string
+		callCount := 0
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					return []byte("False\n"), nil // isNotFileExist: child path free
+				}
+				return []byte("True\n"), nil // isFileExist: parent exists
+			},
+		)
+		disk := Disk{Path: `C:\child.vhd`, Type: "differencing", ParentPath: `C:\parent.vhd`}
+		if err := CreateDisk(disk, false); err != nil {
+			t.Fatalf("CreateDisk: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-Differencing") {
+			t.Errorf("CreateDisk: command %q does not contain '-Differencing'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, `C:\parent.vhd`) {
+			t.Errorf("CreateDisk: command %q does not contain parent path", capturedCmd)
+		}
+	})
+
+	t.Run("runPS error is returned", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("ps error") },
+			func(_ string) ([]byte, error) { return []byte("False\n"), nil },
+		)
+		disk := Disk{Path: `C:\new.vhd`, Type: "dynamic", Size: "10GB"}
+		if err := CreateDisk(disk, false); err == nil {
+			t.Fatal("CreateDisk: expected error from runPS, got nil")
 		}
 	})
 }

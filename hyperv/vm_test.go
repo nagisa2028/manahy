@@ -74,6 +74,8 @@ func TestCheckMemorySize(t *testing.T) {
 		{"empty string", "", true},
 		{"lowercase", "1gb", true},
 		{"with space", "1 GB", true},
+		{"16TB at limit", "16TB", false},
+		{"17TB exceeds limit", "17TB", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -86,6 +88,387 @@ func TestCheckMemorySize(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------- SetVMProcessor ----------
+
+func TestSetVMProcessor(t *testing.T) {
+	t.Run("VM exists calls runPS with count and nested flag", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		if err := SetVMProcessor("my-vm", CPU{Thread: 4, Nested: true}); err != nil {
+			t.Fatalf("SetVMProcessor: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-Count 4") {
+			t.Errorf("SetVMProcessor: command %q does not contain '-Count 4'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "$true") {
+			t.Errorf("SetVMProcessor: command %q does not contain '$true'", capturedCmd)
+		}
+	})
+
+	t.Run("invalid CPU count returns error without runPS call", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		err := SetVMProcessor("my-vm", CPU{Thread: 0})
+		if err == nil {
+			t.Fatal("SetVMProcessor: expected error for Thread=0, got nil")
+		}
+		if runCalled {
+			t.Error("SetVMProcessor: runPS should not be called for invalid CPU")
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := SetVMProcessor("ghost-vm", CPU{Thread: 2})
+		if err == nil {
+			t.Fatal("SetVMProcessor: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMProcessor: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
+// ---------- SetVMMemory ----------
+
+func TestSetVMMemory(t *testing.T) {
+	t.Run("VM exists calls runPS with size and dynamic flag", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := SetVMMemory("my-vm", Memory{Size: "1GB", Dynamic: false}); err != nil {
+			t.Fatalf("SetVMMemory: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "1GB") {
+			t.Errorf("SetVMMemory: command %q does not contain '1GB'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "$false") {
+			t.Errorf("SetVMMemory: command %q does not contain '$false'", capturedCmd)
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := SetVMMemory("ghost-vm", Memory{Size: "512MB"})
+		if err == nil {
+			t.Fatal("SetVMMemory: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMMemory: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
+// ---------- SetVMHardDisk ----------
+
+func TestSetVMHardDisk(t *testing.T) {
+	t.Run("two disks calls runPS twice", func(t *testing.T) {
+		runCount := 0
+		callCount := 0
+		withPS(t,
+			func(_ string) error { runCount++; return nil },
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					return stateOutput("Off"), nil // IsVMExist
+				}
+				return []byte("True\n"), nil // Test-Path for each disk
+			},
+		)
+		if err := SetVMHardDisk("my-vm", []string{`C:\disk1.vhd`, `C:\disk2.vhd`}); err != nil {
+			t.Fatalf("SetVMHardDisk: expected nil, got %v", err)
+		}
+		if runCount != 2 {
+			t.Errorf("SetVMHardDisk: expected runPS called 2 times, got %d", runCount)
+		}
+	})
+
+	t.Run("empty disk list returns nil without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := SetVMHardDisk("my-vm", []string{}); err != nil {
+			t.Fatalf("SetVMHardDisk: expected nil for empty list, got %v", err)
+		}
+		if runCalled {
+			t.Error("SetVMHardDisk: runPS should not be called for empty disk list")
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := SetVMHardDisk("ghost-vm", []string{`C:\disk.vhd`})
+		if err == nil {
+			t.Fatal("SetVMHardDisk: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMHardDisk: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("disk file not found returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return stateOutput("Off"), nil // IsVMExist
+			}
+			return []byte("False\n"), nil // Test-Path: disk not found
+		})
+		err := SetVMHardDisk("my-vm", []string{`C:\missing.vhd`})
+		if err == nil {
+			t.Fatal("SetVMHardDisk: expected error for missing disk, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMHardDisk: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
+// ---------- SetVMImageFile ----------
+
+func TestSetVMImageFile(t *testing.T) {
+	t.Run("VM and image file exist calls runPS", func(t *testing.T) {
+		runCalled := false
+		callCount := 0
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					return stateOutput("Off"), nil // IsVMExist
+				}
+				return []byte("True\n"), nil // isFileExist for image
+			},
+		)
+		if err := SetVMImageFile("my-vm", `C:\image.iso`); err != nil {
+			t.Fatalf("SetVMImageFile: expected nil, got %v", err)
+		}
+		if !runCalled {
+			t.Error("SetVMImageFile: runPS was not called")
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := SetVMImageFile("ghost-vm", `C:\image.iso`)
+		if err == nil {
+			t.Fatal("SetVMImageFile: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMImageFile: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("image file not found returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return stateOutput("Off"), nil // IsVMExist
+			}
+			return []byte("False\n"), nil // isFileExist: image not found
+		})
+		err := SetVMImageFile("my-vm", `C:\missing.iso`)
+		if err == nil {
+			t.Fatal("SetVMImageFile: expected error for missing image, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMImageFile: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+}
+
+// ---------- SetVMSwitch ----------
+
+func TestSetVMSwitch(t *testing.T) {
+	t.Run("switch exists calls runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				return []byte("SwitchType\n----------\nInternal\n"), nil
+			},
+		)
+		if err := SetVMSwitch("my-vm", []string{"mySwitch"}); err != nil {
+			t.Fatalf("SetVMSwitch: expected nil, got %v", err)
+		}
+		if !runCalled {
+			t.Error("SetVMSwitch: runPS was not called")
+		}
+	})
+
+	t.Run("empty switch list returns nil without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				return []byte("SwitchType\n----------\nInternal\n"), nil
+			},
+		)
+		if err := SetVMSwitch("my-vm", []string{}); err != nil {
+			t.Fatalf("SetVMSwitch: expected nil for empty list, got %v", err)
+		}
+		if runCalled {
+			t.Error("SetVMSwitch: runPS should not be called for empty list")
+		}
+	})
+
+	t.Run("switch not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := SetVMSwitch("my-vm", []string{"missing-switch"})
+		if err == nil {
+			t.Fatal("SetVMSwitch: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMSwitch: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("switch unknown state returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("SwitchType\n----------\n"), nil // Unknown
+		})
+		err := SetVMSwitch("my-vm", []string{"ambiguous-switch"})
+		if err == nil {
+			t.Fatal("SetVMSwitch: expected error for Unknown switch state, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to get") {
+			t.Errorf("SetVMSwitch: error %q does not contain 'failed to get'", err.Error())
+		}
+	})
+}
+
+// ---------- CreateVM ----------
+
+func TestCreateVM(t *testing.T) {
+	// makeCreateMock returns an outputPS mock for the minimal VM creation sequence:
+	// call 1: IsNotVMExist (Get-VM) → not found
+	// call 2: isNotFileExist (Test-Path for vm path) → False (path free)
+	// subsequent Get-VM calls: Running (IsVMExist in Set* functions)
+	makeCreateMock := func() func(string) ([]byte, error) {
+		callCount := 0
+		return func(cmd string) ([]byte, error) {
+			if strings.Contains(cmd, "Test-Path") {
+				return []byte("False\n"), nil
+			}
+			callCount++
+			if callCount == 1 {
+				return nil, errors.New("not found") // IsNotVMExist → VM free
+			}
+			return stateOutput("Running"), nil // subsequent IsVMExist calls
+		}
+	}
+
+	minimalVM := VM{
+		Name:       "test-vm",
+		Generation: 1,
+		Path:       `C:\VMs`,
+		Memory:     Memory{Size: "512MB"},
+		CPU:        CPU{Thread: 1},
+	}
+
+	t.Run("minimal VM no disks no image no networks succeeds", func(t *testing.T) {
+		runCount := 0
+		withPS(t,
+			func(_ string) error { runCount++; return nil },
+			makeCreateMock(),
+		)
+		if err := CreateVM(minimalVM, false); err != nil {
+			t.Fatalf("CreateVM: expected nil, got %v", err)
+		}
+		// New-VM + Set-VMProcessor + Set-VMMemory = 3 runPS calls
+		if runCount != 3 {
+			t.Errorf("CreateVM: expected 3 runPS calls, got %d", runCount)
+		}
+	})
+
+	t.Run("VM already exists returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return stateOutput("Running"), nil // IsNotVMExist sees existing VM
+		})
+		err := CreateVM(minimalVM, false)
+		if err == nil {
+			t.Fatal("CreateVM: expected error for existing VM, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("CreateVM: error %q does not contain 'already exists'", err.Error())
+		}
+	})
+
+	t.Run("invalid generation returns error without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+		)
+		vm := minimalVM
+		vm.Generation = 3
+		err := CreateVM(vm, false)
+		if err == nil {
+			t.Fatal("CreateVM: expected error for generation=3, got nil")
+		}
+		if !strings.Contains(err.Error(), "generation") {
+			t.Errorf("CreateVM: error %q does not contain 'generation'", err.Error())
+		}
+		if runCalled {
+			t.Error("CreateVM: runPS should not be called for invalid params")
+		}
+	})
+
+	t.Run("New-VM runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("access denied") },
+			makeCreateMock(),
+		)
+		err := CreateVM(minimalVM, false)
+		if err == nil {
+			t.Fatal("CreateVM: expected error when New-VM fails, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to create VM") {
+			t.Errorf("CreateVM: error %q does not contain 'failed to create VM'", err.Error())
+		}
+	})
+
+	t.Run("image skipped when Image is empty", func(t *testing.T) {
+		var capturedCmds []string
+		withPS(t,
+			func(c string) error { capturedCmds = append(capturedCmds, c); return nil },
+			makeCreateMock(),
+		)
+		vm := minimalVM
+		vm.Image = ""
+		if err := CreateVM(vm, false); err != nil {
+			t.Fatalf("CreateVM: expected nil, got %v", err)
+		}
+		for _, cmd := range capturedCmds {
+			if strings.Contains(cmd, "Add-VMDvdDrive") {
+				t.Errorf("CreateVM: Add-VMDvdDrive called when Image is empty: %q", cmd)
+			}
+		}
+	})
 }
 
 // ---------- GetVMState ----------

@@ -140,6 +140,25 @@ func TestBuildByStruct(t *testing.T) {
 		}
 	})
 
+	t.Run("VM count exceeds maximum returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+		)
+		config := Summarize{
+			Vms: map[string]VM{
+				"cluster": {Count: maxVMCount + 1, Generation: 1, Path: `C:\VMs`, Memory: Memory{Size: "512MB"}, CPU: CPU{Thread: 1}},
+			},
+		}
+		err := BuildByStruct(config)
+		if err == nil {
+			t.Fatal("BuildByStruct: expected error for count exceeding maximum, got nil")
+		}
+		if !strings.Contains(err.Error(), "exceeds maximum") {
+			t.Errorf("BuildByStruct: error %q does not contain 'exceeds maximum'", err.Error())
+		}
+	})
+
 	t.Run("disk alias is resolved before VM creation", func(t *testing.T) {
 		var capturedCmds []string
 		withPS(t,
