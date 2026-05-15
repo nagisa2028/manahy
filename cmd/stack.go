@@ -22,6 +22,9 @@ func newStackCmd(configFile *string) *cobra.Command {
 		newStackListCmd(configFile),
 		newStackStartCmd(configFile),
 		newStackStopCmd(configFile),
+		newStackRestartCmd(configFile),
+		newStackSaveCmd(configFile),
+		newStackResumeCmd(configFile),
 	)
 	return cmd
 }
@@ -154,4 +157,58 @@ func newStackStopCmd(configFile *string) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
 	return cmd
+}
+
+func newStackRestartCmd(configFile *string) *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "restart",
+		Short: "restart all running VMs defined in config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path, data, err := loadStack(configFile)
+			if err != nil {
+				return err
+			}
+			if !confirmAction("Restart all running VMs defined in "+path+"?", force) {
+				return nil
+			}
+			return hyperv.RestartByStruct(data, os.Stderr)
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return cmd
+}
+
+func newStackSaveCmd(configFile *string) *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "save",
+		Short: "save state of all running VMs defined in config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path, data, err := loadStack(configFile)
+			if err != nil {
+				return err
+			}
+			if !confirmAction("Save state of all running VMs defined in "+path+"?", force) {
+				return nil
+			}
+			return hyperv.SaveByStruct(data, os.Stderr)
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	return cmd
+}
+
+func newStackResumeCmd(configFile *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "resume",
+		Short: "resume all saved VMs defined in config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			_, data, err := loadStack(configFile)
+			if err != nil {
+				return err
+			}
+			return hyperv.ResumeByStruct(data, os.Stderr)
+		},
+	}
 }

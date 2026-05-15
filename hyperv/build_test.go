@@ -666,3 +666,99 @@ func TestStopByStruct(t *testing.T) {
 		}
 	})
 }
+
+func TestRestartByStruct(t *testing.T) {
+	t.Run("running VM is restarted", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("RestartByStruct: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Restart-VM") || !strings.Contains(capturedCmd, "router") {
+			t.Errorf("RestartByStruct: unexpected command %q", capturedCmd)
+		}
+	})
+
+	t.Run("non-running VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("RestartByStruct: expected nil, got %v", err)
+		}
+		if runCalled {
+			t.Error("RestartByStruct: runPS called for non-running VM")
+		}
+	})
+}
+
+func TestSaveByStruct(t *testing.T) {
+	t.Run("running VM is saved", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("SaveByStruct: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Save-VM") || !strings.Contains(capturedCmd, "router") {
+			t.Errorf("SaveByStruct: unexpected command %q", capturedCmd)
+		}
+	})
+
+	t.Run("non-running VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("SaveByStruct: expected nil, got %v", err)
+		}
+		if runCalled {
+			t.Error("SaveByStruct: runPS called for non-running VM")
+		}
+	})
+}
+
+func TestResumeByStruct(t *testing.T) {
+	t.Run("saved VM is resumed", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("ResumeByStruct: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Start-VM") || !strings.Contains(capturedCmd, "router") {
+			t.Errorf("ResumeByStruct: unexpected command %q", capturedCmd)
+		}
+	})
+
+	t.Run("non-saved VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("ResumeByStruct: expected nil, got %v", err)
+		}
+		if runCalled {
+			t.Error("ResumeByStruct: runPS called for non-saved VM")
+		}
+	})
+}
