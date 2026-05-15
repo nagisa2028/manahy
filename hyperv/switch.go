@@ -76,7 +76,7 @@ func CreateSwitch(newSwitch VMSwitch, output bool) error {
 		cmd += " -NetAdapterName " + ps(newSwitch.ExternalInterface)
 		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOS)
 	} else {
-		cmd += " -SwitchType " + newSwitch.Type
+		cmd += " -SwitchType " + ps(newSwitch.Type)
 	}
 
 	err = runPS(cmd)
