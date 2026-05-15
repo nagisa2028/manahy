@@ -367,6 +367,16 @@ func TestConvertVHD(t *testing.T) {
 // ---------- checkDiskParam ----------
 
 func TestCheckDiskParam(t *testing.T) {
+	t.Run("relative disk path returns error", func(t *testing.T) {
+		err := checkDiskParam(Disk{Path: `router1.vhd`, Type: "dynamic", Size: "10GB"})
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for relative path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("checkDiskParam: error %q does not contain 'absolute'", err.Error())
+		}
+	})
+
 	t.Run("import disk path not found returns error", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte("False\n"), nil // Test-Path: import file missing
@@ -403,6 +413,20 @@ func TestCheckDiskParam(t *testing.T) {
 		}
 	})
 
+	t.Run("differencing disk with relative parent path returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: child path free
+		})
+		disk := Disk{Path: `C:\VMs\child.vhd`, Type: "differencing", ParentPath: `parent.vhd`}
+		err := checkDiskParam(disk)
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for relative parent path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("checkDiskParam: error %q does not contain 'absolute'", err.Error())
+		}
+	})
+
 	t.Run("differencing disk with missing parent returns error", func(t *testing.T) {
 		callCount := 0
 		withPS(t, nil, func(_ string) ([]byte, error) {
@@ -416,6 +440,20 @@ func TestCheckDiskParam(t *testing.T) {
 		err := checkDiskParam(disk)
 		if err == nil {
 			t.Fatal("checkDiskParam: expected error for missing parent, got nil")
+		}
+	})
+
+	t.Run("fixed disk with negative SourceDisk returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: path free
+		})
+		disk := Disk{Path: `C:\new.vhd`, Type: "fixed", Size: "10GB", SourceDisk: -1}
+		err := checkDiskParam(disk)
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for negative SourceDisk, got nil")
+		}
+		if !strings.Contains(err.Error(), "non-negative") {
+			t.Errorf("checkDiskParam: error %q does not contain 'non-negative'", err.Error())
 		}
 	})
 

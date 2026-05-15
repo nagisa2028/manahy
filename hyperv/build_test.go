@@ -195,6 +195,60 @@ func TestBuildByStruct(t *testing.T) {
 		}
 	})
 
+	t.Run("existing VM is silently skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Get-VM") {
+					return stateOutput("Running"), nil // VM already exists
+				}
+				return []byte("False\n"), nil
+			},
+		)
+		config := Summarize{
+			Vms: map[string]VM{
+				"existing-vm": {Generation: 1, Path: `C:\VMs`, Memory: Memory{Size: "512MB"}, CPU: CPU{Thread: 1}},
+			},
+		}
+		if err := BuildByStruct(config); err != nil {
+			t.Fatalf("BuildByStruct: expected nil for existing VM, got %v", err)
+		}
+		if runCalled {
+			t.Error("BuildByStruct: runPS was called for already-existing VM")
+		}
+	})
+
+	t.Run("existing disk is silently skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("True\n"), nil // disk already exists
+				}
+				return nil, errors.New("not found")
+			},
+		)
+		config := Summarize{
+			Disks: map[string]Disk{
+				"existing-disk": {Path: `C:\VMs\data.vhd`, Size: "10GB", Type: "dynamic"},
+			},
+		}
+		if err := BuildByStruct(config); err != nil {
+			t.Fatalf("BuildByStruct: expected nil for existing disk, got %v", err)
+		}
+		if runCalled {
+			t.Error("BuildByStruct: runPS was called for already-existing disk")
+		}
+	})
+
 }
 
 // --- resolveAndCreateDisks ---
@@ -460,20 +514,47 @@ func TestRemoveByStruct(t *testing.T) {
 		}
 	})
 
-	t.Run("partial failure writes to writer and returns last error", func(t *testing.T) {
+	t.Run("not found resources are silently skipped", func(t *testing.T) {
 		withPS(t,
-			nil,
-			func(_ string) ([]byte, error) {
-				return nil, errors.New("not found")
+			nil, // runPS not reached when resources don't exist
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("False\n"), nil // disk does not exist
+				}
+				return nil, errors.New("not found") // VM/switch not found
 			},
 		)
 		var buf bytes.Buffer
 		config := Summarize{
-			Vms: map[string]VM{"ghost-vm": {Count: 1}},
+			Vms:      map[string]VM{"ghost-vm": {Count: 1}},
+			Networks: map[string]VMSwitch{"ghost-sw": {Type: "internal"}},
+			Disks:    map[string]Disk{"ghost-disk": {Path: `C:\ghost.vhd`}},
+		}
+		err := RemoveByStruct(config, &buf)
+		if err != nil {
+			t.Errorf("RemoveByStruct: expected nil for not-found resources, got %v", err)
+		}
+		if buf.Len() > 0 {
+			t.Errorf("RemoveByStruct: expected no output for not-found resources, got: %s", buf.String())
+		}
+	})
+
+	t.Run("genuine removal failure writes to writer and returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error {
+				return errors.New("access denied")
+			},
+			func(_ string) ([]byte, error) {
+				return stateOutput("Running"), nil // VM exists
+			},
+		)
+		var buf bytes.Buffer
+		config := Summarize{
+			Vms: map[string]VM{"my-vm": {Count: 1}},
 		}
 		err := RemoveByStruct(config, &buf)
 		if err == nil {
-			t.Fatal("RemoveByStruct: expected error for missing VM, got nil")
+			t.Fatal("RemoveByStruct: expected error for removal failure, got nil")
 		}
 		if buf.Len() == 0 {
 			t.Error("RemoveByStruct: expected error written to writer, got nothing")

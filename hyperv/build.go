@@ -1,6 +1,7 @@
 package hyperv
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 )
 
 // BuildByStruct creates VMs, disks, and switches from a Summarize config.
+// Resources that already exist are silently skipped, making the operation idempotent.
 func BuildByStruct(summarize Summarize) error {
 	// Disk aliases referenced by count>1 VMs are created per VM instance below,
 	// not here, so skip them in this standalone pass.
@@ -16,6 +18,13 @@ func BuildByStruct(summarize Summarize) error {
 	for alias, disk := range summarize.Disks {
 		if disk.Import || multiRefs[alias] {
 			continue
+		}
+		exists, err := searchFilePath(disk.Path)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue // disk already exists, skip
 		}
 		if err := CreateDisk(disk, true); err != nil {
 			return err
@@ -44,6 +53,9 @@ func BuildByStruct(summarize Summarize) error {
 			if vm.Count != 1 {
 				named.Name = vm.Name + strconv.Itoa(i)
 			}
+			if GetVMState(named.Name) != vmStateNotFound {
+				continue // VM already exists, skip
+			}
 			diskPaths, err := resolveAndCreateDisks(summarize, vm.Disks, i, vm.Count)
 			if err != nil {
 				return err
@@ -58,34 +70,37 @@ func BuildByStruct(summarize Summarize) error {
 }
 
 // RemoveByStruct removes VMs, switches, and disks defined in a Summarize config.
-// Partial failures are written to w; the last error encountered is returned.
+// Resources that do not exist are silently skipped.
+// Partial failures are written to w; the last non-not-found error encountered is returned.
 func RemoveByStruct(summarize Summarize, w io.Writer) error {
-	var lastErr error
+	var (
+		lastErr error
+		nfe     *notFoundError
+	)
+	skipIfNotFound := func(err error) {
+		if err == nil || errors.As(err, &nfe) {
+			return
+		}
+		_, _ = fmt.Fprintf(w, "%s\n", err)
+		lastErr = err
+	}
+
 	for key, vm := range summarize.Vms {
 		count := vm.Count
 		if count == 0 {
 			count = 1
 		}
 		if count == 1 {
-			if err := RemoveVM(key, false); err != nil {
-				_, _ = fmt.Fprintf(w, "%s\n", err)
-				lastErr = err
-			}
+			skipIfNotFound(RemoveVM(key, false))
 			continue
 		}
 		for i := 1; i <= count; i++ {
-			if err := RemoveVM(key+strconv.Itoa(i), false); err != nil {
-				_, _ = fmt.Fprintf(w, "%s\n", err)
-				lastErr = err
-			}
+			skipIfNotFound(RemoveVM(key+strconv.Itoa(i), false))
 		}
 	}
 	for key, network := range summarize.Networks {
 		network.Name = key
-		if err := RemoveSwitch(network.Name); err != nil {
-			_, _ = fmt.Fprintf(w, "%s\n", err)
-			lastErr = err
-		}
+		skipIfNotFound(RemoveSwitch(network.Name))
 	}
 
 	multiRefs := multiCountDiskRefs(summarize)
@@ -97,17 +112,11 @@ func RemoveByStruct(summarize Summarize, w io.Writer) error {
 			// Remove per-VM numbered copies created by BuildByStruct.
 			count := maxCountForDiskRef(summarize, alias)
 			for i := 1; i <= count; i++ {
-				if err := RemoveDisk(numberPath(disk.Path, i), false); err != nil {
-					_, _ = fmt.Fprintf(w, "%s\n", err)
-					lastErr = err
-				}
+				skipIfNotFound(RemoveDisk(numberPath(disk.Path, i), false))
 			}
 			continue
 		}
-		if err := RemoveDisk(disk.Path, false); err != nil {
-			_, _ = fmt.Fprintf(w, "%s\n", err)
-			lastErr = err
-		}
+		skipIfNotFound(RemoveDisk(disk.Path, false))
 	}
 	return lastErr
 }

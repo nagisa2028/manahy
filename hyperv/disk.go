@@ -54,6 +54,9 @@ func RemoveDisk(path string, output bool) error {
 }
 
 func checkDiskParam(newDisk Disk) error {
+	if !isWindowsAbsPath(newDisk.Path) {
+		return fmt.Errorf("disk path must be absolute: %s", newDisk.Path)
+	}
 	if newDisk.Import {
 		return isFileExist(newDisk.Path)
 	}
@@ -64,10 +67,16 @@ func checkDiskParam(newDisk Disk) error {
 		return err
 	}
 	if newDisk.Type == diskTypeDifferencing {
+		if !isWindowsAbsPath(newDisk.ParentPath) {
+			return fmt.Errorf("parent path must be absolute: %s", newDisk.ParentPath)
+		}
 		if err := isFileExist(newDisk.ParentPath); err != nil {
 			return err
 		}
 		return nil // differencing disks inherit size from parent
+	}
+	if newDisk.Type == diskTypeFixed && newDisk.SourceDisk < 0 {
+		return fmt.Errorf("source disk number must be non-negative, got %d", newDisk.SourceDisk)
 	}
 	return checkDiskSize(newDisk.Size)
 }
