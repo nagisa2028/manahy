@@ -1,212 +1,165 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
+	"strings"
 )
 
-// ---------- //
-// Get Switch
-// ---------- //
-
-// GetSwitchList get a list of Switch
-func GetSwitchList() (switchList SwitchList, err error) {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VMSwitch | Sort-Object SwitchType | Format-Table Name, SwitchType").Output()
-	if err != nil {
-		return switchList, err
+// GetSwitchInfo returns detailed information about a virtual switch.
+func GetSwitchInfo(name string) (string, error) {
+	if err := IsSwitchExist(name); err != nil {
+		return "", err
 	}
-
-	switchList, err = switchListingOfExecuteResults(res)
+	out, err := outputPS(cmdGetVMSwitch + " -Name " + ps(name) +
+		" | Format-List Name, SwitchType, NetAdapterInterfaceDescription, AllowManagementOS, Notes | Out-String")
 	if err != nil {
-		return switchList, err
+		return "", fmt.Errorf("failed to get info for switch %s: %w", name, err)
 	}
-	return switchList, nil
+	return string(out), nil
 }
 
-// GetSwitchType get a Switch Type
-func GetSwitchType(name string) (state string) {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VMSwitch '"+name+"' | Format-Table SwitchType").Output()
+// GetSwitchList returns a list of all virtual switches grouped by type.
+func GetSwitchList() (SwitchList, error) {
+	res, err := outputPS(cmdGetVMSwitch + " | Sort-Object SwitchType | Format-Table Name, SwitchType")
 	if err != nil {
-		state = "NotFound"
-	} else {
-		switchType := listingOfExecuteResults(res, "SwitchType")
-		if len(switchType) == 1 {
-			state = switchType[0]
-		} else {
-			state = "Unknown"
-		}
+		return SwitchList{}, err
 	}
-	return state
+	return switchListingOfExecuteResults(res)
 }
 
+// GetSwitchType returns the type of a virtual switch, or "NotFound" / "Unknown".
+func GetSwitchType(name string) string {
+	res, err := outputPS(cmdGetVMSwitch + " " + ps(name) + " | Format-Table SwitchType")
+	if err != nil {
+		return vmStateNotFound
+	}
+	switchType := listingOfExecuteResults(res, "SwitchType")
+	if len(switchType) == 1 {
+		return switchType[0]
+	}
+	return vmStateUnknown
+}
+
+// IsSwitchExist returns an error if the switch does not exist.
 func IsSwitchExist(name string) error {
-	state := GetSwitchType(name)
-	if state == "Unknown" {
-		return fmt.Errorf("failed get switch state")
-	} else if state == "NotFound" {
-		return fmt.Errorf("%s is not found", name)
+	switch GetSwitchType(name) {
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of switch %s", name)
+	case vmStateNotFound:
+		return fmt.Errorf("switch %s does not exist", name)
 	}
 	return nil
 }
 
+// IsNotSwitchExist returns an error if the switch already exists.
 func IsNotSwitchExist(name string) error {
-	state := GetSwitchType(name)
-	if state == "Unknown" {
-		return fmt.Errorf("failed get switch state")
-	} else if state != "NotFound" {
-		return fmt.Errorf("%s is already found", name)
+	switch GetSwitchType(name) {
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of switch %s", name)
+	case vmStateNotFound:
+		return nil
 	}
-	return nil
+	return fmt.Errorf("switch %s already exists", name)
 }
 
-// ---------------- //
-// Create/Remove Switch
-//  ---------------- //
-
-// CreateSwitch create new switch
+// CreateSwitch creates a new virtual switch.
 func CreateSwitch(newSwitch VMSwitch, output bool) error {
-	var cmd string
 	err := checkSwitchParam(newSwitch)
-	if output {
-		PrintError("Check Switch Param", err)
-	}
+	printError("Check Switch Param", err, output)
 	if err != nil {
 		return err
 	}
 
-	cmd = "New-VMSwitch -name '" + newSwitch.Name + "'"
-	if newSwitch.Type == "external" {
-		cmd += " -NetAdapterName '" + newSwitch.ExternameInterface + "'"
-		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOs)
+	cmd := cmdNewVMSwitch + " -name " + ps(newSwitch.Name)
+	if newSwitch.Type == switchTypeExternal {
+		cmd += " -NetAdapterName " + ps(newSwitch.ExternalInterface)
+		cmd += " -AllowManagementOS $" + strconv.FormatBool(newSwitch.AllowManagementOS)
 	} else {
 		cmd += " -SwitchType " + newSwitch.Type
 	}
 
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if output {
-		PrintError("Create Switch", err)
-	}
+	err = runPS(cmd)
+	printError("Create Switch", err, output)
 	if err != nil {
-		return fmt.Errorf("failed create new switch")
+		return fmt.Errorf("failed to create switch %s: %w", newSwitch.Name, err)
 	}
 	return nil
 }
 
-// RemoveSwitch remove switch
+// RemoveSwitch deletes a virtual switch.
 func RemoveSwitch(name string) error {
-	if GetSwitchType(name) == "NotFound" {
-		return fmt.Errorf("error: %s does not exist", name)
-	} else {
-		err := exec.Command("powershell", "-NoProfile", "Remove-VMSwitch '"+name+"' -Force").Run()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// -------------------- //
-// Update Switch Option
-// -------------------- //
-
-// RenameSwitch rename switch
-func RenameSwitch(name string, newName string) error {
-	err := IsSwitchExist(name)
-	if err != nil {
-		return nil
-	}
-	err = IsNotSwitchExist(newName)
-	if err != nil {
-		return nil
-	}
-
-	err = exec.Command("powershell", "-NoProfile", "Rename-VMSwitch '"+name+"' -NewName "+newName).Run()
-	if err != nil {
+	if err := IsSwitchExist(name); err != nil {
 		return err
 	}
-	return nil
+	return runPS(cmdRemoveVMSwitch + " " + ps(name) + " -Force")
 }
 
-// ChangeSwitchType change switch type
+// RenameSwitch renames a virtual switch.
+func RenameSwitch(name string, newName string) error {
+	if err := IsSwitchExist(name); err != nil {
+		return err
+	}
+	if err := IsNotSwitchExist(newName); err != nil {
+		return err
+	}
+	return runPS(cmdRenameVMSwitch + " " + ps(name) + " -NewName " + ps(newName))
+}
+
+// ChangeSwitchType changes the type of a virtual switch.
 func ChangeSwitchType(name string, switchType string) error {
 	nameType := GetSwitchType(name)
 	switch nameType {
-	case "NotFound":
-		return fmt.Errorf("%s is not exist", name)
-	case "Unknown":
-		return fmt.Errorf("unknown error")
-	default:
-		err := checkSwitchTypeParam(switchType)
-		if err != nil {
-			return err
-		} else if nameType == switchType {
-			return fmt.Errorf("%s's now type already %s", name, switchType)
-		}
-
-		err = exec.Command("powershell", "-NoProfile", "Set-VMSwitch '"+name+"' -SwitchType "+switchType).Run()
-		if err != nil {
-			return err
-		}
+	case vmStateNotFound:
+		return fmt.Errorf("switch %s does not exist", name)
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of switch %s", name)
 	}
-	return nil
+	if err := checkSwitchType(switchType); err != nil {
+		return err
+	}
+	if strings.EqualFold(nameType, switchType) {
+		return fmt.Errorf("switch %s is already of type %s", name, switchType)
+	}
+	return runPS(cmdSetVMSwitch + " " + ps(name) + " -SwitchType " + ps(switchType))
 }
 
-// ChangeSwitchNetAdapter change netpadapter of external switch
+// ChangeSwitchNetAdapter changes the net adapter of an external virtual switch.
 func ChangeSwitchNetAdapter(name string, netAdapter string) error {
-	nameType := GetSwitchType(name)
-	switch nameType {
-	case "NotFound":
-		return fmt.Errorf("%s is not exist", name)
-	case "Unknown":
-		return fmt.Errorf("unknown error")
-	default:
-		err := exec.Command("powershell", "-NoProfile", "Set-VMSwitch '"+name+"' -NetAdapterName '"+netAdapter+"'").Run()
-		if err != nil {
-			return err
-		}
+	switch GetSwitchType(name) {
+	case vmStateNotFound:
+		return fmt.Errorf("switch %s does not exist", name)
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of switch %s", name)
 	}
-	return nil
+	return runPS(cmdSetVMSwitch + " " + ps(name) + " -NetAdapterName " + ps(netAdapter))
 }
-
-// ------------------- //
-// Check Switch Option
-// ------------------- //
 
 func checkSwitchParam(newSwitch VMSwitch) error {
-	if GetSwitchType(newSwitch.Name) != "NotFound" {
-		return fmt.Errorf("%s is already exist", newSwitch.Name)
+	if GetSwitchType(newSwitch.Name) != vmStateNotFound {
+		return fmt.Errorf("switch %s already exists", newSwitch.Name)
 	}
-
-	err := checkSwitchTypeParam(newSwitch.Type)
-	if err != nil {
+	if err := checkSwitchType(newSwitch.Type); err != nil {
 		return err
 	}
-
-	err = checkSwitchParamIntegrity(newSwitch.Type, newSwitch.ExternameInterface)
-	if err != nil {
-		return err
-	}
-	return nil
+	return checkSwitchIntegrity(newSwitch.Type, newSwitch.ExternalInterface)
 }
 
-func checkSwitchTypeParam(switchType string) error {
+func checkSwitchType(switchType string) error {
 	switch switchType {
-	case "external":
-	case "internal":
-	case "private":
+	case switchTypeExternal, switchTypeInternal, switchTypePrivate:
+		return nil
 	default:
-		return fmt.Errorf("undefined switch type")
+		return fmt.Errorf("invalid switch type: %s", switchType)
 	}
-	return nil
 }
 
-func checkSwitchParamIntegrity(switchType string, externameInterface string) error {
-	if switchType == "external" && externameInterface == "" {
-		return fmt.Errorf("need externameInterface option")
-	} else if switchType != "external" && externameInterface != "" {
-		return fmt.Errorf("do not need externameInterface option")
+func checkSwitchIntegrity(switchType string, externalInterface string) error {
+	if switchType == switchTypeExternal && externalInterface == "" {
+		return fmt.Errorf("external interface is required for external switches")
+	}
+	if switchType != switchTypeExternal && externalInterface != "" {
+		return fmt.Errorf("external interface is only valid for external switches")
 	}
 	return nil
 }

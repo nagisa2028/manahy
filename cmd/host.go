@@ -7,29 +7,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newStorageCmd() *cobra.Command {
+func newHostCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "storage",
-		Short: "manage physical storage",
+		Use:   "host",
+		Short: "show Hyper-V host information",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("need a valid subcommand")
 		},
 	}
-	cmd.AddCommand(newStorageListCmd())
+	cmd.AddCommand(
+		newHostShowCmd(),
+		newHostCheckCmd(),
+		newMemberCmd(),
+		newStorageCmd(),
+	)
 	return cmd
 }
 
-func newStorageListCmd() *cobra.Command {
+func newHostShowCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "listing all storage",
+		Use:   "show",
+		Short: "show Hyper-V host configuration",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			storageList, err := hyperv.GetStorageList()
+			out, err := hyperv.GetVMHost()
 			if err != nil {
 				return err
 			}
-			displayStorageList(storageList)
+			fmt.Print(out)
 			return nil
 		},
 	}

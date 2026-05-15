@@ -1,177 +1,206 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import (
 	"fmt"
-	"os/exec"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
-// ------ //
-// Get VM
-// ------ //
+// Hyper-V supports only generation 1 and 2.
+const (
+	minVMGeneration     = 1
+	maxVMGeneration     = 2
+	minVMProcessorCount = 1
+	maxVMCount          = 256
+	maxMemorySizeGB     = 16 * 1024 // 16 TB upper bound for memory size validation
+)
 
-// GetVmList get a list of VMs
-func GetVmList() (vmList VmList, err error) {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VM | Sort-Object State | Format-Table Name, State").Output()
+//nolint:gochecknoglobals
+var reMemorySize = regexp.MustCompile(`^[0-9]+[TGM]B$`)
+
+// GetVMList returns a list of all VMs grouped by state.
+func GetVMList() (VMList, error) {
+	res, err := outputPS(cmdGetVM + " | Sort-Object State | Format-Table Name, State")
 	if err != nil {
-		return vmList, err
+		return VMList{}, err
 	}
-
-	vmList, err = vmListingOfExecuteResults(res)
-	if err != nil {
-		return vmList, err
-	}
-
-	return vmList, nil
+	return vmListingOfExecuteResults(res)
 }
 
-// GetVmState get a VM state
-func GetVmState(name string) (state string) {
-	res, err := exec.Command("powershell", "-NoProfile", "Get-VM '"+name+"' | Format-Table State").Output()
+// GetVMState returns the current state of a VM, or "NotFound" / "Unknown".
+func GetVMState(name string) string {
+	res, err := outputPS(cmdGetVM + " " + ps(name) + " | Format-Table State")
 	if err != nil {
-		return "NotFound"
-	} else {
-		vmState := listingOfExecuteResults(res, "State")
-		if len(vmState) == 1 {
-			return vmState[0]
-		}
+		return vmStateNotFound
 	}
-	return "Unknown"
+	vmState := listingOfExecuteResults(res, "State")
+	if len(vmState) == 1 {
+		return vmState[0]
+	}
+	return vmStateUnknown
 }
 
-// IsVmExist
-func IsVmExist(name string) error {
-	state := GetVmState(name)
-	if state == "Unknown" {
-		return fmt.Errorf("failed get vm state")
-	} else if state == "NotFound" {
-		return fmt.Errorf("%s is not found", name)
+// IsVMExist returns an error if the VM does not exist.
+func IsVMExist(name string) error {
+	switch GetVMState(name) {
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of VM %s", name)
+	case vmStateNotFound:
+		return fmt.Errorf("VM %s does not exist", name)
 	}
 	return nil
 }
 
-// IsNotVmExist
-func IsNotVmExist(name string) error {
-	state := GetVmState(name)
-	if state == "Unknown" {
-		return fmt.Errorf("failed get vm state")
-	} else if state != "NotFound" {
-		return fmt.Errorf("%s is already found", name)
+// IsNotVMExist returns an error if the VM already exists.
+func IsNotVMExist(name string) error {
+	switch GetVMState(name) {
+	case vmStateUnknown:
+		return fmt.Errorf("failed to get state of VM %s", name)
+	case vmStateNotFound:
+		return nil
 	}
-	return nil
+	return fmt.Errorf("VM %s already exists", name)
 }
 
-// -------------- //
-//  Set VM Option
-// -------------- //
-
-// SetVmProcessor is set vm processor
-func SetVmProcessor(name string, cpu Cpu) error {
-	err := IsVmExist(name)
-	if err != nil {
+// SetVMProcessor configures the CPU settings of a VM.
+func SetVMProcessor(name string, cpu CPU) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	err = checkVmProcessorParam(cpu)
-	if err != nil {
+	if err := checkVMProcessor(cpu); err != nil {
 		return err
 	}
 
-	cmd := "Set-VMProcessor '" + name + "'"
+	cmd := cmdSetVMProcessor + " " + ps(name)
 	cmd += " -Count " + strconv.Itoa(cpu.Thread)
 	cmd += " -ExposeVirtualizationExtensions $" + strconv.FormatBool(cpu.Nested)
 
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return runPS(cmd)
 }
 
-func SetVmMemory(name string, memory Memory) error {
-	err := IsVmExist(name)
-	if err != nil {
-		return err
-	}
-	err = checkVmMemoryParam(memory)
-	if err != nil {
+// SetVMMemory configures the memory settings of a VM.
+func SetVMMemory(name string, memory Memory) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
 
-	cmd := "Set-VMMemory -VMName '" + name + "'"
+	cmd := cmdSetVMMemory + " -VMName " + ps(name)
 	cmd += " -StartupBytes " + memory.Size
 	cmd += " -DynamicMemoryEnabled $" + strconv.FormatBool(memory.Dynamic)
 
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return runPS(cmd)
 }
 
-func SetVmHardDisk(name string, disks []string) error {
-	err := IsVmExist(name)
-	if err != nil {
+// SetVMHardDisk attaches hard disk drives to a VM.
+func SetVMHardDisk(name string, disks []string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
 
-	for index := range disks {
-		err := isFileExist(disks[index])
-		if err != nil {
+	for _, disk := range disks {
+		if err := isFileExist(disk); err != nil {
 			return err
 		}
 
-		cmd := "Add-VMHardDiskDrive -VMName '" + name + "'"
-		cmd += " -Path " + disks[index]
+		cmd := cmdAddVMHardDiskDrive + " -VMName " + ps(name)
+		cmd += " -Path " + ps(disk)
 
-		fmt.Printf("%s\n", cmd)
-
-		err = exec.Command("powershell", "-NoProfile", cmd).Run()
-		if err != nil {
+		if err := runPS(cmd); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func SetVmImageFile(name string, image string) error {
-	err := IsVmExist(name)
-	if err != nil {
+// SetVMImageFile attaches a DVD/ISO image to a VM.
+func SetVMImageFile(name string, image string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	err = isFileExist(image)
-	if err != nil {
-		return err
-	}
-
-	cmd := "Add-VMDvdDrive -VMName '" + name + "'"
-	cmd += " -Path " + image
-
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if err != nil {
+	if err := isFileExist(image); err != nil {
 		return err
 	}
 
-	return nil
+	cmd := cmdAddVMDvdDrive + " -VMName " + ps(name)
+	cmd += " -Path " + ps(image)
+
+	return runPS(cmd)
 }
 
-func SetVmSwitch(name string, networks []string) error {
+// SetVMSwitch connects network adapters of a VM to virtual switches.
+func SetVMSwitch(name string, networks []string) error {
 	for _, network := range networks {
-		switchExist := GetSwitchType(network)
-		if switchExist == "NotFound" || switchExist == "Unknown" {
-			return fmt.Errorf("%s is not exist", network)
-		} else if switchExist == "Unknown" {
-			return fmt.Errorf("%s is Unknown error", network)
+		switch GetSwitchType(network) {
+		case vmStateNotFound:
+			return fmt.Errorf("switch %s does not exist", network)
+		case vmStateUnknown:
+			return fmt.Errorf("failed to get state of switch %s", network)
 		}
 
-		cmd := "Add-VMNetworkAdapter -VMName " + name
-		cmd += " -SwitchName " + network
+		cmd := cmdAddVMNetworkAdapter + " -VMName " + ps(name)
+		cmd += " -SwitchName " + ps(network)
 
-		fmt.Printf("%s\n", cmd)
+		if err := runPS(cmd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		err := exec.Command("powershell", "-NoProfile", cmd).Run()
+// CreateVM creates a new VM with the specified configuration.
+func CreateVM(newVM VM, output bool) error {
+	err := checkVMParam(newVM)
+	printError("Check VM Param", err, output)
+	if err != nil {
+		return err
+	}
+
+	cmd := cmdNewVM + " -Name " + ps(newVM.Name)
+	cmd += " -Generation " + strconv.Itoa(newVM.Generation)
+	cmd += " -Path " + ps(newVM.Path)
+
+	err = runPS(cmd)
+	printError("Create VM", err, output)
+	if err != nil {
+		return fmt.Errorf("failed to create VM %s: %w", newVM.Name, err)
+	}
+
+	err = SetVMProcessor(newVM.Name, newVM.CPU)
+	printError("Set Processor", err, output)
+	if err != nil {
+		return err
+	}
+
+	err = SetVMMemory(newVM.Name, newVM.Memory)
+	printError("Set Memory", err, output)
+	if err != nil {
+		return err
+	}
+
+	err = SetVMHardDisk(newVM.Name, newVM.Disks)
+	printError("Set HardDisk", err, output)
+	if err != nil {
+		return err
+	}
+
+	if newVM.Image != "" {
+		err = SetVMImageFile(newVM.Name, newVM.Image)
+		printError("Set Image File", err, output)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = SetVMSwitch(newVM.Name, newVM.Networks)
+	printError("Set VMSwitch", err, output)
+	if err != nil {
+		return err
+	}
+
+	if newVM.Generation == maxVMGeneration && newVM.SecureBoot != nil {
+		err = SetVMSecureBoot(newVM.Name, *newVM.SecureBoot, newVM.SecureBootTemplate)
+		printError("Set Secure Boot", err, output)
 		if err != nil {
 			return err
 		}
@@ -179,257 +208,182 @@ func SetVmSwitch(name string, networks []string) error {
 	return nil
 }
 
-// ---------------- //
-// Create/Remove VM
-//  ---------------- //
-
-func CreateVm(newVm Vm, output bool) error {
-	err := checkVmParam(newVm)
-	if output {
-		PrintError("Check Vm Param", err)
-	}
-	if err != nil {
+// RemoveVM deletes a VM forcefully.
+func RemoveVM(name string, output bool) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
 
-	cmd := "New-VM -Name " + newVm.Name
-	cmd += " -Generation " + strconv.Itoa(newVm.Generation)
-	cmd += " -Path " + newVm.Path
-
-	err = exec.Command("powershell", "-NoProfile", cmd).Run()
-	if output {
-		PrintError("Create Vm", err)
-	}
-	if err != nil {
-		return fmt.Errorf("failed create new vm")
-	}
-
-	err = SetVmProcessor(newVm.Name, newVm.Cpu)
-	if output {
-		PrintError("Set Processor", err)
-	}
-	if err != nil {
-		return err
-	}
-
-	err = SetVmMemory(newVm.Name, newVm.Memory)
-	if output {
-		PrintError("Set Memory", err)
-	}
-	if err != nil {
-		return err
-	}
-
-	err = SetVmHardDisk(newVm.Name, newVm.Disks)
-	if output {
-		PrintError("Set HardDisk", err)
-	}
-	if err != nil {
-		return err
-	}
-
-	err = SetVmImageFile(newVm.Name, newVm.Image)
-	if output {
-		PrintError("Set Image File", err)
-	}
-	if err != nil {
-		return err
-	}
-
-	err = SetVmSwitch(newVm.Name, newVm.Networks)
-	if output {
-		PrintError("Set VMSwitch", err)
-	}
-	if err != nil {
-		return err
-	}
-
-	return nil
+	err := runPS(cmdRemoveVM + " -Name " + ps(name) + " -Force")
+	printError("Remove VM", err, output)
+	return err
 }
 
-func RemoveVm(name string, output bool) error {
-	err := IsVmExist(name)
-	if err != nil {
+// RenameVM renames a VM.
+func RenameVM(name string, newName string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
-
-	err = exec.Command("powershell", "-NoProfile", "Remove-VM -Name '"+name+"' -Force").Run()
-	if output {
-		PrintError("Remove Vm", err)
-	}
-	if err != nil {
+	if err := IsNotVMExist(newName); err != nil {
 		return err
 	}
-	return nil
+	return runPS(cmdRenameVM + " -Name " + ps(name) + " -NewName " + ps(newName))
 }
 
-// ---------------- //
-// Update Vm Option
-// ---------------- //
+// ConnectVM opens a VM console connection.
+func ConnectVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdVMConnect + " localhost " + ps(name))
+}
 
-func RenameVm(name string, newName string) error {
-	err := IsVmExist(name)
-	if err != nil {
+// StartVM starts a VM.
+func StartVM(name string) error {
+	if GetVMState(name) == vmStateRunning {
+		return fmt.Errorf("VM %s is already running", name)
+	}
+	return runPS(cmdStartVM + " " + ps(name))
+}
+
+// StopVM shuts down a VM gracefully.
+func StopVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdStopVM + " -Name " + ps(name))
+}
+
+// DestroyVM force-stops a VM.
+func DestroyVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdStopVM + " -Force -Name " + ps(name))
+}
+
+// SaveVM saves the state of a VM.
+func SaveVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdSaveVM + " -Name " + ps(name))
+}
+
+// SuspendVM pauses a VM.
+func SuspendVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdSuspendVM + " -Name " + ps(name))
+}
+
+// RestartVM restarts a VM.
+func RestartVM(name string) error {
+	if GetVMState(name) != vmStateRunning {
+		return fmt.Errorf("VM %s is not running", name)
+	}
+	return runPS(cmdRestartVM + " -Name " + ps(name) + " -Force")
+}
+
+// ResumeVM resumes a paused VM.
+func ResumeVM(name string) error {
+	if GetVMState(name) != vmStatePaused {
+		return fmt.Errorf("VM %s is not paused", name)
+	}
+	return runPS(cmdResumeVM + " -Name " + ps(name))
+}
+
+// ExportVM exports a VM to the specified directory.
+func ExportVM(name, path string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	err = IsNotVmExist(newName)
-	if err != nil {
+	return runPSLong(cmdExportVM + " -Name " + ps(name) + " -Path " + ps(path))
+}
+
+// ImportVM registers a VM from a .vmcx file path.
+func ImportVM(path string) error {
+	return runPSLong(cmdImportVM + " -Path " + ps(path))
+}
+
+// MoveVMStorage moves all VM storage files to a new directory on the same host.
+func MoveVMStorage(name, destPath string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
+	return runPSLong(cmdMoveVMStorage + " -VMName " + ps(name) + " -DestinationStoragePath " + ps(destPath))
+}
 
-	err = exec.Command("powershell", "-NoProfile", "Rename-VM -Name '"+name+"' -NewName '"+newName+"'").Run()
-	if err != nil {
+// CopyVM exports the source VM then imports it as a new VM with a different name.
+// The exported files are placed under destPath and remain after the copy completes.
+func CopyVM(name, newName, destPath string) error {
+	if err := IsVMExist(name); err != nil {
 		return err
 	}
-	return nil
-}
-
-// ------------ //
-// VM Operation
-// ------------ //
-
-// ConnectVm connect the VM
-func ConnectVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "vmconnect localhost '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// StartVm start the VM
-func StartVm(name string) error {
-	if GetVmState(name) != "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Start-VM '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is already running", name)
-}
-
-// StopVm stop the VM
-func StopVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Stop-VM -Name '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// DestroyVm force stop VM
-func DestroyVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Stop-VM -Force -Name '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// SaveVm save VM
-func SaveVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Save-VM -Name '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// SuspendVm suspend vm
-func SuspendVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Suspend-VM -Name '"+name+"'").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// RestartVM restart vm
-func RestartVm(name string) error {
-	if GetVmState(name) == "Running" {
-		err := exec.Command("powershell", "-NoProfile", "Restart-VM -Name '"+name+"' -Force").Run()
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not running", name)
-}
-
-// --------------- //
-// Check VM Option
-// --------------- //
-
-func checkVmParam(newVm Vm) error {
-	err := IsNotVmExist(newVm.Name)
-	if err != nil {
+	if err := IsNotVMExist(newName); err != nil {
 		return err
 	}
+	// Guard against backslashes in VM names breaking the intermediate path construction.
+	if strings.ContainsAny(name, `\/`) {
+		return fmt.Errorf("VM name %q must not contain path separators", name)
+	}
+	script := cmdExportVM + " -Name " + ps(name) + " -Path " + ps(destPath) + "; " +
+		"$vmcx = (Get-ChildItem -Recurse -Path " + ps(destPath+"\\"+name) + " -Filter '*.vmcx' | Select-Object -First 1).FullName; " +
+		"$newVM = " + cmdImportVM + " -Path $vmcx -Copy -GenerateNewId; " +
+		cmdRenameVM + " -VM $newVM -NewName " + ps(newName)
+	return runPSLong(script)
+}
 
-	err = checkVmGeneration(newVm.Generation)
-	if err != nil {
+func checkVMParam(newVM VM) error {
+	if err := IsNotVMExist(newVM.Name); err != nil {
 		return err
 	}
-
-	err = checkVmPath(newVm.Name, newVm.Path)
-	if err != nil {
+	if err := checkVMGeneration(newVM.Generation); err != nil {
 		return err
 	}
-
-	if newVm.Image != "" {
-		err := isFileExist(newVm.Image)
-		if err != nil {
-			return err
-		}
+	if err := checkVMPath(newVM.Name, newVM.Path); err != nil {
+		return err
+	}
+	if err := checkMemorySize(newVM.Memory.Size); err != nil {
+		return err
+	}
+	if newVM.Image != "" {
+		return isFileExist(newVM.Image)
 	}
 	return nil
 }
 
-func checkVmGeneration(generation int) error {
-	if generation < 1 || generation > 2 {
-		return fmt.Errorf("generation is not a valid value")
+func checkVMGeneration(generation int) error {
+	if generation < minVMGeneration || generation > maxVMGeneration {
+		return fmt.Errorf("generation must be %d or %d", minVMGeneration, maxVMGeneration)
 	}
 	return nil
 }
 
-func checkVmPath(name string, path string) error {
-	err := isNotFileExist(path + "\\" + name)
-	if err != nil {
-		return err
+func checkVMPath(name string, path string) error {
+	return isNotFileExist(path + "\\" + name)
+}
+
+func checkVMProcessor(cpu CPU) error {
+	if cpu.Thread < minVMProcessorCount {
+		return fmt.Errorf("vcpu count must be at least %d", minVMProcessorCount)
 	}
 	return nil
 }
 
-func checkVmProcessorParam(cpu Cpu) error {
-	if cpu.Thread < 0 {
-		return fmt.Errorf("thread does not valid value")
+func checkMemorySize(size string) error {
+	if reMemorySize.FindString(size) == "" {
+		return fmt.Errorf("invalid memory size format: %s (expected e.g. 512MB, 1GB)", size)
 	}
-	return nil
-}
-
-func checkVmMemoryParam(memory Memory) error {
+	n, _ := strconv.Atoi(size[:len(size)-2])
+	unit := size[len(size)-2:]
+	sizeGB := n
+	if unit == "TB" {
+		sizeGB = n * 1024
+	}
+	if sizeGB > maxMemorySizeGB {
+		return fmt.Errorf("memory size %s exceeds maximum allowed size of %dTB", size, maxMemorySizeGB/1024)
+	}
 	return nil
 }

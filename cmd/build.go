@@ -1,23 +1,35 @@
 package cmd
 
 import (
-	"github.com/DevelopNaoki/manahy/modules"
+	"fmt"
+	"os"
+
+	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
 )
 
-var build = &cobra.Command{
-	Use:   "build",
-	Short: "create vm, disk and switch from manahy.yaml",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		data, err := modules.UnmarshalYaml("manahy.yaml")
-		if err != nil {
-			return err
-		}
-
-			err = modules.BuildByStruct(data)
+func newBuildCmd(configFile *string) *cobra.Command {
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "build",
+		Short: "create vm, disk and switch from config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path := *configFile
+			if path == "" {
+				path = "manahy.yaml"
+			}
+			data, err := hyperv.UnmarshalYaml(path)
 			if err != nil {
 				return err
 			}
-		return nil
-	},
+			fmt.Fprintf(os.Stderr, "using config: %s\n", path)
+			if dryRun {
+				hyperv.DryRunBuild(data, os.Stdout)
+				return nil
+			}
+			return hyperv.BuildByStruct(data)
+		},
+	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be created without making changes")
+	return cmd
 }

@@ -1,38 +1,41 @@
-// hyperv package is manage Hyper-V
 package hyperv
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 )
 
-func seatchFilePath(path string) (exist bool, err error) {
-	res, e := exec.Command("powershell", "-NoProfile", "Test-Path \""+path+"\"").Output()
+func searchFilePath(path string) (bool, error) {
+	res, e := outputPS(cmdTestPath + " " + ps(path))
 	if e != nil {
-		return false, fmt.Errorf("error: failed execute 'Test-Path'")
+		return false, fmt.Errorf("failed to execute Test-Path: %w", e)
 	}
-	exist, _ = strconv.ParseBool(strings.Replace(string(res), "\r\n", "", -1))
+	exist, err := strconv.ParseBool(strings.TrimSpace(string(res)))
+	if err != nil {
+		return false, fmt.Errorf("unexpected Test-Path output for %s: %w", path, err)
+	}
 	return exist, nil
 }
 
 func isFileExist(path string) error {
-	exist, err := seatchFilePath(path)
+	exist, err := searchFilePath(path)
 	if err != nil {
 		return err
-	} else if !exist {
-		return fmt.Errorf("%s is not exist", path)
+	}
+	if !exist {
+		return fmt.Errorf("%s does not exist", path)
 	}
 	return nil
 }
 
 func isNotFileExist(path string) error {
-	exist, err := seatchFilePath(path)
+	exist, err := searchFilePath(path)
 	if err != nil {
 		return err
-	} else if exist {
-		return fmt.Errorf("%s is already exist", path)
+	}
+	if exist {
+		return fmt.Errorf("%s already exists", path)
 	}
 	return nil
 }

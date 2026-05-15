@@ -1,15 +1,14 @@
+// Package main is the entry point for the manahy CLI.
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/DevelopNaoki/manahy/cmd"
 )
 
 func main() {
-	if err := cmd.RootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "")
-		os.Exit(-1)
+	if err := cmd.Execute(); err != nil {
+		os.Exit(1)
 	}
 }
