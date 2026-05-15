@@ -179,3 +179,60 @@ func TestCheckCommandGroups(t *testing.T) {
 		}
 	})
 }
+
+// TestCheckCmdletsConcurrent verifies that checkCmdlets is race-free.
+// Run with -race to detect data races.
+func TestCheckCmdletsConcurrent(t *testing.T) {
+	t.Run("no data race under repeated concurrent calls", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte(""), nil
+		})
+		for i := 0; i < 20; i++ {
+			results := CheckVMCommands()
+			if len(results) == 0 {
+				t.Fatalf("iteration %d: expected results, got none", i)
+			}
+			for _, r := range results {
+				if r.Status != CheckOK {
+					t.Errorf("iteration %d: %q expected CheckOK, got %v", i, r.Name, r.Status)
+				}
+			}
+		}
+	})
+
+	t.Run("result slice length matches input", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte(""), nil
+		})
+		cmdlets := []string{"Get-VM", "New-VM", "Remove-VM"}
+		results := checkCmdlets(cmdlets)
+		if len(results) != len(cmdlets) {
+			t.Errorf("checkCmdlets: expected %d results, got %d", len(cmdlets), len(results))
+		}
+		for i, r := range results {
+			if r.Name != cmdlets[i] {
+				t.Errorf("checkCmdlets: results[%d].Name = %q, want %q", i, r.Name, cmdlets[i])
+			}
+		}
+	})
+
+	t.Run("order preserved despite concurrent execution", func(t *testing.T) {
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			if strings.Contains(cmd, "New-VM") {
+				return nil, errors.New("not found")
+			}
+			return []byte(""), nil
+		})
+		cmdlets := []string{"Get-VM", "New-VM", "Remove-VM"}
+		results := checkCmdlets(cmdlets)
+		if results[0].Status != CheckOK {
+			t.Errorf("checkCmdlets: results[0] (Get-VM) expected OK, got %v", results[0].Status)
+		}
+		if results[1].Status != CheckFail {
+			t.Errorf("checkCmdlets: results[1] (New-VM) expected Fail, got %v", results[1].Status)
+		}
+		if results[2].Status != CheckOK {
+			t.Errorf("checkCmdlets: results[2] (Remove-VM) expected OK, got %v", results[2].Status)
+		}
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
 )
@@ -60,6 +61,29 @@ func loadConfig(path string) hyperv.Summarize {
 		return hyperv.Summarize{}
 	}
 	return config
+}
+
+// runParallel runs fn for every name concurrently and returns the last error.
+func runParallel(names []string, fn func(string) error) error {
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		lastErr error
+	)
+	for _, name := range names {
+		name := name
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(name); err != nil {
+				mu.Lock()
+				lastErr = err
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return lastErr
 }
 
 // resolveDisk resolves a disk alias to a path using the loaded config.

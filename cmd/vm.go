@@ -174,12 +174,9 @@ func newVMRemoveCmd() *cobra.Command {
 			if !confirmAction(prompt, force) {
 				return nil
 			}
-			for _, name := range args {
-				if err := hyperv.RemoveVM(name, false); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, func(name string) error {
+				return hyperv.RemoveVM(name, false)
+			})
 		},
 	}
 	c.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
@@ -207,12 +204,7 @@ func newVMStartCmd() *cobra.Command {
 		Short: "start VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.StartVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.StartVM)
 		},
 	}
 }
@@ -223,12 +215,7 @@ func newVMSaveCmd() *cobra.Command {
 		Short: "save VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.SaveVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.SaveVM)
 		},
 	}
 }
@@ -239,12 +226,7 @@ func newVMShutdownCmd() *cobra.Command {
 		Short: "shutdown VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.StopVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.StopVM)
 		},
 	}
 }
@@ -255,12 +237,7 @@ func newVMDestroyCmd() *cobra.Command {
 		Short: "destroy VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.DestroyVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.DestroyVM)
 		},
 	}
 }
@@ -271,12 +248,7 @@ func newVMSuspendCmd() *cobra.Command {
 		Short: "suspend VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.SuspendVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.SuspendVM)
 		},
 	}
 }
@@ -287,12 +259,7 @@ func newVMResumeCmd() *cobra.Command {
 		Short: "resume paused VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.ResumeVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.ResumeVM)
 		},
 	}
 }
@@ -303,12 +270,7 @@ func newVMRestartCmd() *cobra.Command {
 		Short: "restart VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			for _, name := range args {
-				if err := hyperv.RestartVM(name); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runParallel(args, hyperv.RestartVM)
 		},
 	}
 }

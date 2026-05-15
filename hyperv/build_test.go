@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -611,25 +612,36 @@ func TestStartByStruct(t *testing.T) {
 	})
 
 	t.Run("count>1 starts all instances", func(t *testing.T) {
-		var capturedCmds []string
+		var (
+			mu           sync.Mutex
+			capturedCmds []string
+		)
 		withPS(t,
-			func(c string) error { capturedCmds = append(capturedCmds, c); return nil },
+			func(c string) error {
+				mu.Lock()
+				capturedCmds = append(capturedCmds, c)
+				mu.Unlock()
+				return nil
+			},
 			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 3}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
 			t.Fatalf("StartByStruct count>1: expected nil, got %v", err)
 		}
+		mu.Lock()
+		cmds := capturedCmds
+		mu.Unlock()
 		for _, name := range []string{"router1", "router2", "router3"} {
 			found := false
-			for _, cmd := range capturedCmds {
+			for _, cmd := range cmds {
 				if strings.Contains(cmd, name) {
 					found = true
 					break
 				}
 			}
 			if !found {
-				t.Errorf("StartByStruct count>1: %q not started; commands: %v", name, capturedCmds)
+				t.Errorf("StartByStruct count>1: %q not started; commands: %v", name, cmds)
 			}
 		}
 	})
@@ -759,6 +771,104 @@ func TestResumeByStruct(t *testing.T) {
 		}
 		if runCalled {
 			t.Error("ResumeByStruct: runPS called for non-saved VM")
+		}
+	})
+}
+
+// TestByStructConcurrent verifies that the parallel ByStruct functions are race-free.
+// Run with -race to detect data races.
+func TestByStructConcurrent(t *testing.T) {
+	multiConfig := Summarize{
+		Vms: map[string]VM{
+			"alpha": {Count: 1},
+			"beta":  {Count: 3},
+		},
+	}
+
+	t.Run("StartByStruct no data race", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		for i := 0; i < 20; i++ {
+			if err := StartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
+				t.Fatalf("iteration %d: unexpected error: %v", i, err)
+			}
+		}
+	})
+
+	t.Run("StopByStruct no data race", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		for i := 0; i < 20; i++ {
+			if err := StopByStruct(multiConfig, &bytes.Buffer{}); err != nil {
+				t.Fatalf("iteration %d: unexpected error: %v", i, err)
+			}
+		}
+	})
+
+	t.Run("RestartByStruct no data race", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		for i := 0; i < 20; i++ {
+			if err := RestartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
+				t.Fatalf("iteration %d: unexpected error: %v", i, err)
+			}
+		}
+	})
+
+	t.Run("SaveByStruct no data race", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		for i := 0; i < 20; i++ {
+			if err := SaveByStruct(multiConfig, &bytes.Buffer{}); err != nil {
+				t.Fatalf("iteration %d: unexpected error: %v", i, err)
+			}
+		}
+	})
+
+	t.Run("ResumeByStruct no data race", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+		)
+		for i := 0; i < 20; i++ {
+			if err := ResumeByStruct(multiConfig, &bytes.Buffer{}); err != nil {
+				t.Fatalf("iteration %d: unexpected error: %v", i, err)
+			}
+		}
+	})
+
+	t.Run("all instances execute despite concurrent errors", func(t *testing.T) {
+		var (
+			mu    sync.Mutex
+			count int
+		)
+		withPS(t,
+			func(_ string) error {
+				mu.Lock()
+				count++
+				mu.Unlock()
+				return errors.New("simulated error")
+			},
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 4}}}
+		err := StartByStruct(config, &bytes.Buffer{})
+		if err == nil {
+			t.Fatal("StartByStruct: expected error, got nil")
+		}
+		mu.Lock()
+		got := count
+		mu.Unlock()
+		if got != 4 {
+			t.Errorf("StartByStruct: expected 4 PS calls, got %d", got)
 		}
 	})
 }

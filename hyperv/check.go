@@ -1,6 +1,9 @@
 package hyperv
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 // CheckStatus represents the result of a single check.
 type CheckStatus int
@@ -93,9 +96,16 @@ func checkHyperVPermission() CheckResult {
 
 func checkCmdlets(cmdlets []string) []CheckResult {
 	results := make([]CheckResult, len(cmdlets))
+	var wg sync.WaitGroup
 	for i, c := range cmdlets {
-		results[i] = checkCmdletExists(c)
+		i, c := i, c
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i] = checkCmdletExists(c)
+		}()
 	}
+	wg.Wait()
 	return results
 }
 
