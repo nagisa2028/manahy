@@ -419,6 +419,20 @@ func TestCheckDiskParam(t *testing.T) {
 		}
 	})
 
+	t.Run("fixed disk with negative SourceDisk returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // isNotFileExist: path free
+		})
+		disk := Disk{Path: `C:\new.vhd`, Type: "fixed", Size: "10GB", SourceDisk: -1}
+		err := checkDiskParam(disk)
+		if err == nil {
+			t.Fatal("checkDiskParam: expected error for negative SourceDisk, got nil")
+		}
+		if !strings.Contains(err.Error(), "non-negative") {
+			t.Errorf("checkDiskParam: error %q does not contain 'non-negative'", err.Error())
+		}
+	})
+
 	t.Run("valid dynamic disk returns nil", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte("False\n"), nil // isNotFileExist: path free

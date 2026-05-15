@@ -69,6 +69,9 @@ func checkDiskParam(newDisk Disk) error {
 		}
 		return nil // differencing disks inherit size from parent
 	}
+	if newDisk.Type == diskTypeFixed && newDisk.SourceDisk < 0 {
+		return fmt.Errorf("source disk number must be non-negative, got %d", newDisk.SourceDisk)
+	}
 	return checkDiskSize(newDisk.Size)
 }
 
