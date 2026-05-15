@@ -69,6 +69,116 @@ func BuildByStruct(summarize Summarize) error {
 	return nil
 }
 
+// vmInstanceNames returns the expanded VM instance names for a given config key and VM.
+// count=0 and count=1 both return [key]; count>1 returns [key1, key2, ..., keyN].
+func vmInstanceNames(key string, vm VM) []string {
+	count := vm.Count
+	if count <= 1 {
+		return []string{key}
+	}
+	names := make([]string, count)
+	for i := range names {
+		names[i] = key + strconv.Itoa(i+1)
+	}
+	return names
+}
+
+// StartByStruct starts all VMs defined in the config.
+// VMs that are already running or not found are silently skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func StartByStruct(summarize Summarize, w io.Writer) error {
+	var lastErr error
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			state := GetVMState(name)
+			if state == vmStateRunning || state == vmStateNotFound {
+				continue
+			}
+			if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
+				_, _ = fmt.Fprintf(w, "failed to start %s: %s\n", name, err)
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
+}
+
+// StopByStruct gracefully stops all VMs defined in the config.
+// VMs that are not running or not found are silently skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func StopByStruct(summarize Summarize, w io.Writer) error {
+	var lastErr error
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			if GetVMState(name) != vmStateRunning {
+				continue
+			}
+			if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
+				_, _ = fmt.Fprintf(w, "failed to stop %s: %s\n", name, err)
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
+}
+
+// RestartByStruct restarts all running VMs defined in the config.
+// VMs that are not running or not found are silently skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func RestartByStruct(summarize Summarize, w io.Writer) error {
+	var lastErr error
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			if GetVMState(name) != vmStateRunning {
+				continue
+			}
+			if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
+				_, _ = fmt.Fprintf(w, "failed to restart %s: %s\n", name, err)
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
+}
+
+// SaveByStruct saves the state of all running VMs defined in the config.
+// VMs that are not running or not found are silently skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func SaveByStruct(summarize Summarize, w io.Writer) error {
+	var lastErr error
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			if GetVMState(name) != vmStateRunning {
+				continue
+			}
+			if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {
+				_, _ = fmt.Fprintf(w, "failed to save %s: %s\n", name, err)
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
+}
+
+// ResumeByStruct resumes all saved VMs defined in the config.
+// VMs that are not in saved state or not found are silently skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func ResumeByStruct(summarize Summarize, w io.Writer) error {
+	var lastErr error
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			if GetVMState(name) != vmStateSaved {
+				continue
+			}
+			if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
+				_, _ = fmt.Fprintf(w, "failed to resume %s: %s\n", name, err)
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
+}
+
 // RemoveByStruct removes VMs, switches, and disks defined in a Summarize config.
 // Resources that do not exist are silently skipped.
 // Partial failures are written to w; the last non-not-found error encountered is returned.
@@ -86,16 +196,8 @@ func RemoveByStruct(summarize Summarize, w io.Writer) error {
 	}
 
 	for key, vm := range summarize.Vms {
-		count := vm.Count
-		if count == 0 {
-			count = 1
-		}
-		if count == 1 {
-			skipIfNotFound(RemoveVM(key, false))
-			continue
-		}
-		for i := 1; i <= count; i++ {
-			skipIfNotFound(RemoveVM(key+strconv.Itoa(i), false))
+		for _, name := range vmInstanceNames(key, vm) {
+			skipIfNotFound(RemoveVM(name, false))
 		}
 	}
 	for key, network := range summarize.Networks {

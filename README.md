@@ -44,17 +44,49 @@ Subcommands for per-category detail:
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
-| `--config` | `-c` | `manahy.yaml` | Config file path (used by `build` / `remove` and for disk alias resolution) |
+| `--config` | `-c` | `manahy.yaml` | Config file path (used by `stack` subcommands and for disk alias resolution) |
+| `--verbose` | | | Print each PowerShell command before execution |
 | `--help` | `-h` | | Show help |
 
 The `-c` flag is inherited by all subcommands:
 
 ```
-> manahy -c infra.yaml build
+> manahy -c infra.yaml stack build
 > manahy -c infra.yaml disk info test-disk
 ```
 
 ## Commands
+
+### stack — config-based bulk operations
+
+Operates on all resources defined in a config file at once.
+
+```
+> manahy stack build              # create all VMs, disks, and switches
+> manahy stack remove             # remove all resources
+> manahy stack list               # show status of all resources
+> manahy stack start              # start all VMs
+> manahy stack stop               # stop all running VMs
+> manahy stack restart            # restart all running VMs
+> manahy stack save               # save state of all running VMs
+> manahy stack resume             # resume all saved VMs
+```
+
+`build` and `remove` are idempotent: resources that already exist are skipped on `build`, and resources that do not exist are skipped on `remove`.
+
+`--dry-run` previews changes without applying them:
+
+```
+> manahy stack build --dry-run
+> manahy stack remove --dry-run
+```
+
+`--force` skips the confirmation prompt on destructive operations:
+
+```
+> manahy stack remove --force
+> manahy stack stop --force
+```
 
 ### vm — virtual machine management
 
@@ -62,8 +94,8 @@ The `-c` flag is inherited by all subcommands:
 > manahy vm list
 > manahy vm state <name>
 > manahy vm create -n <name> -m <memory> -p <path> [options]
-> manahy vm remove <name> [name...]
-> manahy vm rename <name> --new-name <new>
+> manahy vm remove  <name> [name...]
+> manahy vm rename  <name> --new-name <new>
 > manahy vm start   <name> [name...]
 > manahy vm shutdown <name> [name...]
 > manahy vm destroy  <name> [name...]
@@ -78,7 +110,7 @@ The `-c` flag is inherited by all subcommands:
 > manahy vm copy     <name> --new-name <new> --path <dir>
 > manahy vm info     <name>
 > manahy vm measure  <name>
-> manahy vm integration list   <name>
+> manahy vm integration list    <name>
 > manahy vm integration enable  <name> --name <service>
 > manahy vm integration disable <name> --name <service>
 ```
@@ -98,13 +130,33 @@ The `-c` flag is inherited by all subcommands:
 | `--network` | `-s` | Virtual switch name |
 | `--image` | `-i` | ISO image path |
 
+#### vm dvd — DVD drive management
+
+```
+> manahy vm dvd list   <vm>
+> manahy vm dvd add    <vm>
+> manahy vm dvd remove <vm>
+> manahy vm dvd set    <vm> --image <iso>
+> manahy vm dvd eject  <vm>
+```
+
+#### vm nic — network adapter management
+
+```
+> manahy vm nic list    <vm>
+> manahy vm nic add     <vm> [--name <name>] [--switch <switch>]
+> manahy vm nic remove  <vm> --name <name>
+> manahy vm nic connect <vm> --name <name> --switch <switch>
+> manahy vm nic vlan    <vm> --name <name> --id <vlan-id>
+```
+
 ### disk — virtual disk (VHD) management
 
 ```
 > manahy disk create --path <path> --size <size> --type <type>
-> manahy disk remove <path>
-> manahy disk info   <path>
-> manahy disk resize <path> --size <size>
+> manahy disk remove  <path>
+> manahy disk info    <path>
+> manahy disk resize  <path> --size <size>
 > manahy disk optimize <path>
 > manahy disk convert  <path> --dest <dest>
 > manahy disk mount    <path>
@@ -121,6 +173,7 @@ Disk types: `dynamic`, `fixed`, `differencing`
 > manahy switch create -n <name> -t <type> [--external-interface <adapter>]
 > manahy switch remove <name>
 > manahy switch rename <name> --new-name <new>
+> manahy switch info   <name>
 > manahy switch configure type    <name> --type <type>
 > manahy switch configure adapter <name> --adapter <adapter>
 ```
@@ -130,31 +183,12 @@ Switch types: `external`, `internal`, `private`
 ### checkpoint — VM checkpoint management
 
 ```
-> manahy checkpoint create <vm> [--name <name>]
-> manahy checkpoint list   <vm>
+> manahy checkpoint create  <vm> [--name <name>]
+> manahy checkpoint list    <vm>
 > manahy checkpoint restore <vm> --name <name>
 > manahy checkpoint remove  <vm> --name <name>
 > manahy checkpoint rename  <vm> --name <name> --new-name <new>
 > manahy checkpoint export  <vm> --name <name> --path <dir>
-```
-
-### dvd — VM DVD drive management
-
-```
-> manahy dvd list   <vm>
-> manahy dvd add    <vm>
-> manahy dvd remove <vm>
-> manahy dvd set    <vm> --image <iso>
-> manahy dvd eject  <vm>
-```
-
-### nic — VM network adapter management
-
-```
-> manahy nic list    <vm>
-> manahy nic add     <vm> [--name <name>] [--switch <switch>]
-> manahy nic remove  <vm> --name <name>
-> manahy nic connect <vm> --name <name> --switch <switch>
 ```
 
 ### host — host information and management
@@ -170,7 +204,7 @@ Switch types: `external`, `internal`, `private`
 
 ## Config file (manahy.yaml)
 
-`build` and `remove` operate on all resources defined in the config file at once.
+`stack` subcommands operate on all resources defined in the config file at once.
 The map key is the resource name; no separate `name:` field is needed.
 Disk map keys can be used as **aliases** in VM `disks:` lists.
 
@@ -215,7 +249,7 @@ vms:
       - internal-net
 ```
 
-#### Disk behaviour with `count > 1`
+### Disk behaviour with `count > 1`
 
 When `count` is greater than 1, each VM instance gets its **own numbered disk copy**.
 The numeric suffix is inserted before the file extension:
@@ -224,29 +258,24 @@ The numeric suffix is inserted before the file extension:
 |-------|---------|---------------|
 | `boot-disk` (`C:\VMs\boot.vhd`) | `3` | `boot1.vhd`, `boot2.vhd`, `boot3.vhd` |
 
-`remove` deletes the same numbered copies; the base path (e.g. `boot.vhd`) is never touched.
+`stack remove` deletes the same numbered copies; the base path (e.g. `boot.vhd`) is never touched.
 
 Disks marked `import: true` are treated as **read-only references** and are shared across all instances without copying or deletion.
 
-### build / remove
+### `stack list` output
+
+Shows the live status of every resource defined in the config:
 
 ```
-> manahy build              # uses manahy.yaml
-> manahy -c infra.yaml build
-> manahy build --dry-run    # preview what would be created
-> manahy remove --dry-run   # preview what would be removed
-> manahy remove             # remove all resources defined in the config
-```
-
-`--dry-run` output example (with `count: 3`):
-
-```
-[dry-run] build
-  disk      boot-disk1                create    C:\VMs\boot1.vhd (50GB, dynamic)
-  vm        web1                      create    gen2, 2GB, 2 vCPU
-  disk      boot-disk2                create    C:\VMs\boot2.vhd (50GB, dynamic)
-  vm        web2                      create    gen2, 2GB, 2 vCPU
-  disk      boot-disk3                create    C:\VMs\boot3.vhd (50GB, dynamic)
-  vm        web3                      create    gen2, 2GB, 2 vCPU
-  network   internal-net              create    internal
+VMs:
+  web1                           Running
+  web2                           Off
+  web3                           Running
+Disks:
+  boot-disk1                     present (C:\VMs\boot1.vhd)
+  boot-disk2                     present (C:\VMs\boot2.vhd)
+  boot-disk3                     present (C:\VMs\boot3.vhd)
+Networks:
+  external-net                   External
+  internal-net                   Internal
 ```
