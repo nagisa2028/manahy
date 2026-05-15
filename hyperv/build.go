@@ -9,6 +9,7 @@ import (
 )
 
 // BuildByStruct creates VMs, disks, and switches from a Summarize config.
+// Resources that already exist are silently skipped, making the operation idempotent.
 func BuildByStruct(summarize Summarize) error {
 	// Disk aliases referenced by count>1 VMs are created per VM instance below,
 	// not here, so skip them in this standalone pass.
@@ -17,6 +18,13 @@ func BuildByStruct(summarize Summarize) error {
 	for alias, disk := range summarize.Disks {
 		if disk.Import || multiRefs[alias] {
 			continue
+		}
+		exists, err := searchFilePath(disk.Path)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue // disk already exists, skip
 		}
 		if err := CreateDisk(disk, true); err != nil {
 			return err
@@ -44,6 +52,9 @@ func BuildByStruct(summarize Summarize) error {
 			named := vm
 			if vm.Count != 1 {
 				named.Name = vm.Name + strconv.Itoa(i)
+			}
+			if GetVMState(named.Name) != vmStateNotFound {
+				continue // VM already exists, skip
 			}
 			diskPaths, err := resolveAndCreateDisks(summarize, vm.Disks, i, vm.Count)
 			if err != nil {
