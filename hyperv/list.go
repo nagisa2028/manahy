@@ -1,6 +1,10 @@
 package hyperv
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strconv"
+)
 
 // ResourceStatus holds the name and current status of a single resource.
 type ResourceStatus struct {
@@ -24,18 +28,39 @@ func GetResourceList(configFile string) (ResourceList, error) {
 
 	var rl ResourceList
 
-	for name := range cfg.Vms {
-		state := GetVMState(name)
-		rl.VMs = append(rl.VMs, ResourceStatus{Name: name, Status: state})
+	for name, vm := range cfg.Vms {
+		count := vm.Count
+		if count == 0 {
+			count = 1
+		}
+		if count == 1 {
+			rl.VMs = append(rl.VMs, ResourceStatus{Name: name, Status: GetVMState(name)})
+		} else {
+			for i := 1; i <= count; i++ {
+				instanceName := name + strconv.Itoa(i)
+				rl.VMs = append(rl.VMs, ResourceStatus{Name: instanceName, Status: GetVMState(instanceName)})
+			}
+		}
 	}
 
+	multiRefs := multiCountDiskRefs(cfg)
 	for name, d := range cfg.Disks {
-		path := d.Path
-		status := "present"
-		if err2 := isFileExist(path); err2 != nil {
-			status = "missing"
+		if multiRefs[name] {
+			count := maxCountForDiskRef(cfg, name)
+			for i := 1; i <= count; i++ {
+				path := numberPath(d.Path, i)
+				status := diskFileStatus(path)
+				rl.Disks = append(rl.Disks, ResourceStatus{
+					Name:   name + strconv.Itoa(i),
+					Status: fmt.Sprintf("%s (%s)", status, path),
+				})
+			}
+		} else {
+			rl.Disks = append(rl.Disks, ResourceStatus{
+				Name:   name,
+				Status: fmt.Sprintf("%s (%s)", diskFileStatus(d.Path), d.Path),
+			})
 		}
-		rl.Disks = append(rl.Disks, ResourceStatus{Name: name, Status: fmt.Sprintf("%s (%s)", status, path)})
 	}
 
 	for name := range cfg.Networks {
@@ -46,5 +71,16 @@ func GetResourceList(configFile string) (ResourceList, error) {
 		rl.Networks = append(rl.Networks, ResourceStatus{Name: name, Status: switchStatus})
 	}
 
+	sort.Slice(rl.VMs, func(i, j int) bool { return rl.VMs[i].Name < rl.VMs[j].Name })
+	sort.Slice(rl.Disks, func(i, j int) bool { return rl.Disks[i].Name < rl.Disks[j].Name })
+	sort.Slice(rl.Networks, func(i, j int) bool { return rl.Networks[i].Name < rl.Networks[j].Name })
+
 	return rl, nil
+}
+
+func diskFileStatus(path string) string {
+	if err := isFileExist(path); err != nil {
+		return "missing"
+	}
+	return "present"
 }

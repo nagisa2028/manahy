@@ -152,4 +152,98 @@ disks:
 			t.Fatal("GetResourceList: expected error for missing file, got nil")
 		}
 	})
+
+	t.Run("count>1 VM expands to numbered instances", func(t *testing.T) {
+		const multiYAML = `
+vms:
+  router:
+    count: 3
+    generation: 1
+    cpu:
+      thread: 1
+    memory:
+      size: 512MB
+    path: C:\VMs
+disks: {}
+networks: {}
+`
+		mf, err := os.CreateTemp(t.TempDir(), "manahy-multi-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		if _, err = mf.WriteString(multiYAML); err != nil {
+			t.Fatalf("failed to write temp file: %v", err)
+		}
+		_ = mf.Close()
+
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			if strings.Contains(cmd, "Get-VM") {
+				return stateOutput("Running"), nil
+			}
+			return []byte("True\n"), nil
+		})
+
+		rl, err := GetResourceList(mf.Name())
+		if err != nil {
+			t.Fatalf("GetResourceList count>1: expected nil, got %v", err)
+		}
+		if len(rl.VMs) != 3 {
+			t.Fatalf("GetResourceList count>1: expected 3 VMs, got %d: %v", len(rl.VMs), rl.VMs)
+		}
+		for i, want := range []string{"router1", "router2", "router3"} {
+			if rl.VMs[i].Name != want {
+				t.Errorf("GetResourceList count>1: VMs[%d].Name = %q, want %q", i, rl.VMs[i].Name, want)
+			}
+		}
+	})
+
+	t.Run("multiRef disk expands to numbered paths", func(t *testing.T) {
+		const multiDiskYAML = `
+vms:
+  router:
+    count: 2
+    generation: 1
+    cpu:
+      thread: 1
+    memory:
+      size: 512MB
+    path: C:\VMs
+    disks:
+      - rtr-disk
+networks: {}
+disks:
+  rtr-disk:
+    path: C:\Hyper-V\Disks\router.vhd
+    size: 10GB
+    type: dynamic
+`
+		mf, err := os.CreateTemp(t.TempDir(), "manahy-multidisk-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		if _, err = mf.WriteString(multiDiskYAML); err != nil {
+			t.Fatalf("failed to write temp file: %v", err)
+		}
+		_ = mf.Close()
+
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			if strings.Contains(cmd, "Get-VM") {
+				return stateOutput("Running"), nil
+			}
+			return []byte("True\n"), nil // all Test-Path return present
+		})
+
+		rl, err := GetResourceList(mf.Name())
+		if err != nil {
+			t.Fatalf("GetResourceList multiRef disk: expected nil, got %v", err)
+		}
+		if len(rl.Disks) != 2 {
+			t.Fatalf("GetResourceList multiRef disk: expected 2 disks, got %d: %v", len(rl.Disks), rl.Disks)
+		}
+		for i, want := range []string{"rtr-disk1", "rtr-disk2"} {
+			if rl.Disks[i].Name != want {
+				t.Errorf("GetResourceList multiRef disk: Disks[%d].Name = %q, want %q", i, rl.Disks[i].Name, want)
+			}
+		}
+	})
 }
