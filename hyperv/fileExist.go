@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// notFoundError is returned when a resource (file, VM, switch) does not exist.
+// Callers can use errors.As to distinguish "not found" from other failures.
+type notFoundError struct{ msg string }
+
+func (e *notFoundError) Error() string { return e.msg }
+
 func searchFilePath(path string) (bool, error) {
 	res, e := outputPS(cmdTestPath + " " + ps(path))
 	if e != nil {
@@ -24,7 +30,7 @@ func isFileExist(path string) error {
 		return err
 	}
 	if !exist {
-		return fmt.Errorf("%s does not exist", path)
+		return &notFoundError{msg: fmt.Sprintf("%s does not exist", path)}
 	}
 	return nil
 }

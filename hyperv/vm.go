@@ -47,7 +47,7 @@ func IsVMExist(name string) error {
 	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of VM %s", name)
 	case vmStateNotFound:
-		return fmt.Errorf("VM %s does not exist", name)
+		return &notFoundError{msg: fmt.Sprintf("VM %s does not exist", name)}
 	}
 	return nil
 }

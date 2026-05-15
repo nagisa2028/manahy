@@ -47,7 +47,7 @@ func IsSwitchExist(name string) error {
 	case vmStateUnknown:
 		return fmt.Errorf("failed to get state of switch %s", name)
 	case vmStateNotFound:
-		return fmt.Errorf("switch %s does not exist", name)
+		return &notFoundError{msg: fmt.Sprintf("switch %s does not exist", name)}
 	}
 	return nil
 }
