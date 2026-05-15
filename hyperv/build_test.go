@@ -561,3 +561,108 @@ func TestRemoveByStruct(t *testing.T) {
 		}
 	})
 }
+
+// --- StartByStruct / StopByStruct ---
+
+func TestStartByStruct(t *testing.T) {
+	t.Run("off VM is started", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StartByStruct: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Start-VM") || !strings.Contains(capturedCmd, "router") {
+			t.Errorf("StartByStruct: unexpected command %q", capturedCmd)
+		}
+	})
+
+	t.Run("already running VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StartByStruct: expected nil, got %v", err)
+		}
+		if runCalled {
+			t.Error("StartByStruct: runPS called for already-running VM")
+		}
+	})
+
+	t.Run("not found VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+		)
+		config := Summarize{Vms: map[string]VM{"ghost": {Count: 1}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StartByStruct: expected nil for not-found VM, got %v", err)
+		}
+		if runCalled {
+			t.Error("StartByStruct: runPS called for not-found VM")
+		}
+	})
+
+	t.Run("count>1 starts all instances", func(t *testing.T) {
+		var capturedCmds []string
+		withPS(t,
+			func(c string) error { capturedCmds = append(capturedCmds, c); return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 3}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StartByStruct count>1: expected nil, got %v", err)
+		}
+		for _, name := range []string{"router1", "router2", "router3"} {
+			found := false
+			for _, cmd := range capturedCmds {
+				if strings.Contains(cmd, name) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("StartByStruct count>1: %q not started; commands: %v", name, capturedCmds)
+			}
+		}
+	})
+}
+
+func TestStopByStruct(t *testing.T) {
+	t.Run("running VM is stopped", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StopByStruct: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Stop-VM") || !strings.Contains(capturedCmd, "router") {
+			t.Errorf("StopByStruct: unexpected command %q", capturedCmd)
+		}
+	})
+
+	t.Run("non-running VM is skipped", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
+			t.Fatalf("StopByStruct: expected nil, got %v", err)
+		}
+		if runCalled {
+			t.Error("StopByStruct: runPS called for non-running VM")
+		}
+	})
+}
