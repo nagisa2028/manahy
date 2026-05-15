@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // BuildByStruct creates VMs, disks, and switches from a Summarize config.
@@ -83,99 +84,121 @@ func vmInstanceNames(key string, vm VM) []string {
 	return names
 }
 
-// StartByStruct starts all VMs defined in the config.
+// runVMsParallel launches one goroutine per VM instance in summarize, calling fn for each.
+// All instances run concurrently; the helper waits for all to finish.
+func runVMsParallel(summarize Summarize, fn func(name string)) {
+	var wg sync.WaitGroup
+	for key, vm := range summarize.Vms {
+		for _, name := range vmInstanceNames(key, vm) {
+			name := name
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				fn(name)
+			}()
+		}
+	}
+	wg.Wait()
+}
+
+// StartByStruct starts all VMs defined in the config concurrently.
 // VMs that are already running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StartByStruct(summarize Summarize, w io.Writer) error {
+	var mu sync.Mutex
 	var lastErr error
-	for key, vm := range summarize.Vms {
-		for _, name := range vmInstanceNames(key, vm) {
-			state := GetVMState(name)
-			if state == vmStateRunning || state == vmStateNotFound {
-				continue
-			}
-			if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
-				_, _ = fmt.Fprintf(w, "failed to start %s: %s\n", name, err)
-				lastErr = err
-			}
+	runVMsParallel(summarize, func(name string) {
+		state := GetVMState(name)
+		if state == vmStateRunning || state == vmStateNotFound {
+			return
 		}
-	}
+		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to start %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
 	return lastErr
 }
 
-// StopByStruct gracefully stops all VMs defined in the config.
+// StopByStruct gracefully stops all VMs defined in the config concurrently.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StopByStruct(summarize Summarize, w io.Writer) error {
+	var mu sync.Mutex
 	var lastErr error
-	for key, vm := range summarize.Vms {
-		for _, name := range vmInstanceNames(key, vm) {
-			if GetVMState(name) != vmStateRunning {
-				continue
-			}
-			if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
-				_, _ = fmt.Fprintf(w, "failed to stop %s: %s\n", name, err)
-				lastErr = err
-			}
+	runVMsParallel(summarize, func(name string) {
+		if GetVMState(name) != vmStateRunning {
+			return
 		}
-	}
+		if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to stop %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
 	return lastErr
 }
 
-// RestartByStruct restarts all running VMs defined in the config.
+// RestartByStruct restarts all running VMs defined in the config concurrently.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func RestartByStruct(summarize Summarize, w io.Writer) error {
+	var mu sync.Mutex
 	var lastErr error
-	for key, vm := range summarize.Vms {
-		for _, name := range vmInstanceNames(key, vm) {
-			if GetVMState(name) != vmStateRunning {
-				continue
-			}
-			if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
-				_, _ = fmt.Fprintf(w, "failed to restart %s: %s\n", name, err)
-				lastErr = err
-			}
+	runVMsParallel(summarize, func(name string) {
+		if GetVMState(name) != vmStateRunning {
+			return
 		}
-	}
+		if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to restart %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
 	return lastErr
 }
 
-// SaveByStruct saves the state of all running VMs defined in the config.
+// SaveByStruct saves the state of all running VMs defined in the config concurrently.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func SaveByStruct(summarize Summarize, w io.Writer) error {
+	var mu sync.Mutex
 	var lastErr error
-	for key, vm := range summarize.Vms {
-		for _, name := range vmInstanceNames(key, vm) {
-			if GetVMState(name) != vmStateRunning {
-				continue
-			}
-			if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {
-				_, _ = fmt.Fprintf(w, "failed to save %s: %s\n", name, err)
-				lastErr = err
-			}
+	runVMsParallel(summarize, func(name string) {
+		if GetVMState(name) != vmStateRunning {
+			return
 		}
-	}
+		if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to save %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
 	return lastErr
 }
 
-// ResumeByStruct resumes all saved VMs defined in the config.
+// ResumeByStruct resumes all saved VMs defined in the config concurrently.
 // VMs that are not in saved state or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func ResumeByStruct(summarize Summarize, w io.Writer) error {
+	var mu sync.Mutex
 	var lastErr error
-	for key, vm := range summarize.Vms {
-		for _, name := range vmInstanceNames(key, vm) {
-			if GetVMState(name) != vmStateSaved {
-				continue
-			}
-			if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
-				_, _ = fmt.Fprintf(w, "failed to resume %s: %s\n", name, err)
-				lastErr = err
-			}
+	runVMsParallel(summarize, func(name string) {
+		if GetVMState(name) != vmStateSaved {
+			return
 		}
-	}
+		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to resume %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
 	return lastErr
 }
 
