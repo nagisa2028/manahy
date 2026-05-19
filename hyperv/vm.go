@@ -41,6 +41,31 @@ func GetVMState(name string) string {
 	return vmStateUnknown
 }
 
+// getVMStateMap returns name→state for all VMs on the host in one PS call.
+// VMs whose state cannot be parsed are omitted; callers treat missing entries as NotFound.
+func getVMStateMap() map[string]string {
+	res, err := outputPS(cmdGetVM + " | Format-Table Name, State")
+	if err != nil {
+		return map[string]string{}
+	}
+	m := make(map[string]string)
+	for _, line := range reSplit.Split(string(res), -1) {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.Contains(line, "Name") || reDashOnly.MatchString(line) {
+			continue
+		}
+		state := reVMState.FindString(line)
+		if state == "" {
+			continue
+		}
+		name := strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
+		if name != "" {
+			m[name] = state
+		}
+	}
+	return m
+}
+
 // IsVMExist returns an error if the VM does not exist.
 func IsVMExist(name string) error {
 	switch GetVMState(name) {
@@ -97,20 +122,22 @@ func SetVMHardDisk(name string, disks []string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-
+	if len(disks) == 0 {
+		return nil
+	}
 	for _, disk := range disks {
 		if err := isFileExist(disk); err != nil {
 			return err
 		}
-
-		cmd := cmdAddVMHardDiskDrive + " -VMName " + ps(name)
-		cmd += " -Path " + ps(disk)
-
-		if err := runPS(cmd); err != nil {
-			return err
-		}
 	}
-	return nil
+	var sb strings.Builder
+	for i, disk := range disks {
+		if i > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(cmdAddVMHardDiskDrive + " -VMName " + ps(name) + " -Path " + ps(disk))
+	}
+	return runPS(sb.String())
 }
 
 // SetVMImageFile attaches a DVD/ISO image to a VM.
@@ -130,6 +157,9 @@ func SetVMImageFile(name string, image string) error {
 
 // SetVMSwitch connects network adapters of a VM to virtual switches.
 func SetVMSwitch(name string, networks []string) error {
+	if len(networks) == 0 {
+		return nil
+	}
 	for _, network := range networks {
 		switch GetSwitchType(network) {
 		case vmStateNotFound:
@@ -137,15 +167,15 @@ func SetVMSwitch(name string, networks []string) error {
 		case vmStateUnknown:
 			return fmt.Errorf("failed to get state of switch %s", network)
 		}
-
-		cmd := cmdAddVMNetworkAdapter + " -VMName " + ps(name)
-		cmd += " -SwitchName " + ps(network)
-
-		if err := runPS(cmd); err != nil {
-			return err
-		}
 	}
-	return nil
+	var sb strings.Builder
+	for i, network := range networks {
+		if i > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(cmdAddVMNetworkAdapter + " -VMName " + ps(name) + " -SwitchName " + ps(network))
+	}
+	return runPS(sb.String())
 }
 
 // CreateVM creates a new VM with the specified configuration.

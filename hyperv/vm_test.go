@@ -2,6 +2,7 @@ package hyperv
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -176,11 +177,18 @@ func TestSetVMMemory(t *testing.T) {
 // ---------- SetVMHardDisk ----------
 
 func TestSetVMHardDisk(t *testing.T) {
-	t.Run("two disks calls runPS twice", func(t *testing.T) {
+	t.Run("two disks batched into one runPS call", func(t *testing.T) {
 		runCount := 0
 		callCount := 0
 		withPS(t,
-			func(_ string) error { runCount++; return nil },
+			func(cmd string) error {
+				runCount++
+				// Both disk paths must appear in the single batched command.
+				if !strings.Contains(cmd, `C:\disk1.vhd`) || !strings.Contains(cmd, `C:\disk2.vhd`) {
+					return fmt.Errorf("SetVMHardDisk: expected both disks in one command, got: %q", cmd)
+				}
+				return nil
+			},
 			func(_ string) ([]byte, error) {
 				callCount++
 				if callCount == 1 {
@@ -192,8 +200,8 @@ func TestSetVMHardDisk(t *testing.T) {
 		if err := SetVMHardDisk("my-vm", []string{`C:\disk1.vhd`, `C:\disk2.vhd`}); err != nil {
 			t.Fatalf("SetVMHardDisk: expected nil, got %v", err)
 		}
-		if runCount != 2 {
-			t.Errorf("SetVMHardDisk: expected runPS called 2 times, got %d", runCount)
+		if runCount != 1 {
+			t.Errorf("SetVMHardDisk: expected 1 batched runPS call, got %d", runCount)
 		}
 	})
 

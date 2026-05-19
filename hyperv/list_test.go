@@ -38,20 +38,19 @@ disks:
 		t.Fatalf("failed to close temp file: %v", err)
 	}
 
-	// makeHook returns a hook that answers True for all Test-Path calls except
-	// for the disk path, which returns the value controlled by diskPresent.
+	// makeHook returns a hook for the batch queries used by GetResourceList.
+	// vmState is returned for "test-vm"; switchType (empty string → missing) for "test-switch".
 	makeHook := func(vmState string, switchType string, diskPresent bool) func(string) ([]byte, error) {
 		return func(cmd string) ([]byte, error) {
 			// Check Get-VMSwitch before Get-VM because the latter is a substring of the former.
 			if strings.Contains(cmd, "Get-VMSwitch") {
 				if switchType == "" {
-					// Returning an error causes GetSwitchType to return vmStateNotFound.
 					return nil, errors.New("not found")
 				}
-				return []byte("SwitchType\n----------\n" + switchType + "\n"), nil
+				return []byte("Name        SwitchType\n----        ----------\ntest-switch " + switchType + "\n"), nil
 			}
 			if strings.Contains(cmd, "Get-VM") {
-				return []byte("State\n-----\n" + vmState + "\n"), nil
+				return []byte("Name     State\n----     -----\ntest-vm  " + vmState + "\n"), nil
 			}
 			// Test-Path: return True for config yaml, controlled for disk path.
 			if strings.Contains(cmd, diskPath) {
@@ -80,6 +79,32 @@ disks:
 		}
 		if rl.VMs[0].Status != "Running" {
 			t.Errorf("GetResourceList: VM status %q, want 'Running'", rl.VMs[0].Status)
+		}
+	})
+
+	t.Run("VM not on host shown as NotFound", func(t *testing.T) {
+		withPS(t, nil, makeHook("Off", "Internal", false))
+		// makeHook returns "test-vm Off"; to simulate a missing VM we use an empty batch response.
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			if strings.Contains(cmd, "Get-VMSwitch") {
+				return []byte("Name        SwitchType\n----        ----------\ntest-switch Internal\n"), nil
+			}
+			if strings.Contains(cmd, "Get-VM") {
+				// Empty batch: no VMs on host.
+				return []byte("Name  State\n----  -----\n"), nil
+			}
+			return []byte("True\n"), nil
+		})
+
+		rl, err := GetResourceList(f.Name())
+		if err != nil {
+			t.Fatalf("GetResourceList: expected nil, got %v", err)
+		}
+		if len(rl.VMs) != 1 {
+			t.Fatalf("GetResourceList: expected 1 VM, got %d", len(rl.VMs))
+		}
+		if rl.VMs[0].Status != vmStateNotFound {
+			t.Errorf("GetResourceList: VM status %q, want %q", rl.VMs[0].Status, vmStateNotFound)
 		}
 	})
 
@@ -178,7 +203,7 @@ networks: {}
 
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VM") {
-				return stateOutput("Running"), nil
+				return []byte("Name     State\n----     -----\nrouter1  Running\nrouter2  Running\nrouter3  Running\n"), nil
 			}
 			return []byte("True\n"), nil
 		})
@@ -228,7 +253,7 @@ disks:
 
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VM") {
-				return stateOutput("Running"), nil
+				return []byte("Name     State\n----     -----\nrouter1  Running\nrouter2  Running\n"), nil
 			}
 			return []byte("True\n"), nil // all Test-Path return present
 		})
@@ -284,6 +309,10 @@ disks:
   disk-y:
     path: C:\disks\y.vhd
 `
+	const vmBatchRunning = "Name   State\n----   -----\nalpha  Running\nbeta1  Running\nbeta2  Running\nbeta3  Running\n"
+	const vmBatchOff = "Name   State\n----   -----\nalpha  Off\nbeta1  Off\nbeta2  Off\nbeta3  Off\n"
+	const switchBatch = "Name   SwitchType\n----   ----------\nnet-a  Internal\nnet-b  Private\nnet-c  Internal\n"
+
 	writeYAML := func(t *testing.T, content string) string {
 		t.Helper()
 		mf, err := os.CreateTemp(t.TempDir(), "manahy-concurrent-*.yaml")
@@ -300,10 +329,10 @@ disks:
 	t.Run("all groups complete and counts are exact", func(t *testing.T) {
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VMSwitch") {
-				return []byte("SwitchType\n----------\nInternal\n"), nil
+				return []byte(switchBatch), nil
 			}
 			if strings.Contains(cmd, "Get-VM") {
-				return stateOutput("Running"), nil
+				return []byte(vmBatchRunning), nil
 			}
 			return []byte("True\n"), nil
 		})
@@ -329,10 +358,10 @@ disks:
 	t.Run("output is sorted despite concurrent execution", func(t *testing.T) {
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VMSwitch") {
-				return []byte("SwitchType\n----------\nInternal\n"), nil
+				return []byte(switchBatch), nil
 			}
 			if strings.Contains(cmd, "Get-VM") {
-				return stateOutput("Off"), nil
+				return []byte(vmBatchOff), nil
 			}
 			return []byte("True\n"), nil
 		})
@@ -351,10 +380,10 @@ disks:
 		// Run this test with -race to catch any data races.
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VMSwitch") {
-				return []byte("SwitchType\n----------\nInternal\n"), nil
+				return []byte(switchBatch), nil
 			}
 			if strings.Contains(cmd, "Get-VM") {
-				return stateOutput("Running"), nil
+				return []byte(vmBatchRunning), nil
 			}
 			return []byte("True\n"), nil
 		})

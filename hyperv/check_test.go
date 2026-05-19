@@ -6,6 +6,34 @@ import (
 	"testing"
 )
 
+// cmdletsFromBatchCmd extracts single-quoted cmdlet names from a batch Get-Command
+// call and returns them newline-separated, simulating PowerShell finding all of them.
+func cmdletsFromBatchCmd(cmd string) []byte {
+	parts := strings.Split(cmd, "'")
+	var sb strings.Builder
+	for i := 1; i < len(parts); i += 2 {
+		if name := parts[i]; name != "" {
+			sb.WriteString(name)
+			sb.WriteByte('\n')
+		}
+	}
+	return []byte(sb.String())
+}
+
+// cmdletsFromBatchCmdExcept is like cmdletsFromBatchCmd but omits one name,
+// simulating PowerShell not finding that particular cmdlet.
+func cmdletsFromBatchCmdExcept(cmd, exclude string) []byte {
+	parts := strings.Split(cmd, "'")
+	var sb strings.Builder
+	for i := 1; i < len(parts); i += 2 {
+		if name := parts[i]; name != "" && name != exclude {
+			sb.WriteString(name)
+			sb.WriteByte('\n')
+		}
+	}
+	return []byte(sb.String())
+}
+
 // --- checkPSAvailable ---
 
 func TestCheckPSAvailable(t *testing.T) {
@@ -139,8 +167,9 @@ func TestCheckSystem(t *testing.T) {
 
 func TestCheckCommandGroups(t *testing.T) {
 	t.Run("all VM cmdlets available", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte(""), nil
+		// Return all cmdlet names from the batch command as found.
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			return cmdletsFromBatchCmd(cmd), nil
 		})
 		for _, r := range CheckVMCommands() {
 			if r.Status != CheckOK {
@@ -150,11 +179,9 @@ func TestCheckCommandGroups(t *testing.T) {
 	})
 
 	t.Run("one disk cmdlet missing", func(t *testing.T) {
+		// Return all disk cmdlets except New-VHD from the batch command.
 		withPS(t, nil, func(cmd string) ([]byte, error) {
-			if strings.Contains(cmd, "New-VHD") {
-				return nil, errors.New("not found")
-			}
-			return []byte(""), nil
+			return cmdletsFromBatchCmdExcept(cmd, "New-VHD"), nil
 		})
 		results := CheckDiskCommands()
 		found := false
@@ -166,11 +193,17 @@ func TestCheckCommandGroups(t *testing.T) {
 		if !found {
 			t.Error("CheckDiskCommands: expected New-VHD to be CheckFail")
 		}
+		// All other disk cmdlets should be OK.
+		for _, r := range results {
+			if r.Name != "New-VHD" && r.Status != CheckOK {
+				t.Errorf("CheckDiskCommands: %q expected OK, got Fail", r.Name)
+			}
+		}
 	})
 
 	t.Run("all network cmdlets available", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte(""), nil
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			return cmdletsFromBatchCmd(cmd), nil
 		})
 		for _, r := range CheckNetworkCommands() {
 			if r.Status != CheckOK {
@@ -180,26 +213,8 @@ func TestCheckCommandGroups(t *testing.T) {
 	})
 }
 
-// TestCheckCmdletsConcurrent verifies that checkCmdlets is race-free.
-// Run with -race to detect data races.
-func TestCheckCmdletsConcurrent(t *testing.T) {
-	t.Run("no data race under repeated concurrent calls", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte(""), nil
-		})
-		for i := 0; i < 20; i++ {
-			results := CheckVMCommands()
-			if len(results) == 0 {
-				t.Fatalf("iteration %d: expected results, got none", i)
-			}
-			for _, r := range results {
-				if r.Status != CheckOK {
-					t.Errorf("iteration %d: %q expected CheckOK, got %v", i, r.Name, r.Status)
-				}
-			}
-		}
-	})
-
+// TestCheckCmdletsBatch verifies the single-call batch implementation of checkCmdlets.
+func TestCheckCmdletsBatch(t *testing.T) {
 	t.Run("result slice length matches input", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte(""), nil
@@ -216,12 +231,19 @@ func TestCheckCmdletsConcurrent(t *testing.T) {
 		}
 	})
 
-	t.Run("order preserved despite concurrent execution", func(t *testing.T) {
-		withPS(t, nil, func(cmd string) ([]byte, error) {
-			if strings.Contains(cmd, "New-VM") {
-				return nil, errors.New("not found")
-			}
+	t.Run("empty input returns nil", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte(""), nil
+		})
+		if results := checkCmdlets(nil); results != nil {
+			t.Errorf("checkCmdlets(nil): expected nil, got %v", results)
+		}
+	})
+
+	t.Run("order preserved in results", func(t *testing.T) {
+		// New-VM is absent; Get-VM and Remove-VM are present.
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			return cmdletsFromBatchCmdExcept(cmd, "New-VM"), nil
 		})
 		cmdlets := []string{"Get-VM", "New-VM", "Remove-VM"}
 		results := checkCmdlets(cmdlets)
@@ -233,6 +255,36 @@ func TestCheckCmdletsConcurrent(t *testing.T) {
 		}
 		if results[2].Status != CheckOK {
 			t.Errorf("checkCmdlets: results[2] (Remove-VM) expected OK, got %v", results[2].Status)
+		}
+	})
+
+	t.Run("all cmdlets missing when PS call fails", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("PS unavailable")
+		})
+		cmdlets := []string{"Get-VM", "New-VM"}
+		results := checkCmdlets(cmdlets)
+		for _, r := range results {
+			if r.Status != CheckFail {
+				t.Errorf("checkCmdlets PS error: %q expected CheckFail, got %v", r.Name, r.Status)
+			}
+		}
+	})
+
+	t.Run("repeated calls produce consistent results", func(t *testing.T) {
+		withPS(t, nil, func(cmd string) ([]byte, error) {
+			return cmdletsFromBatchCmd(cmd), nil
+		})
+		for i := 0; i < 20; i++ {
+			results := CheckVMCommands()
+			if len(results) == 0 {
+				t.Fatalf("iteration %d: expected results, got none", i)
+			}
+			for _, r := range results {
+				if r.Status != CheckOK {
+					t.Errorf("iteration %d: %q expected CheckOK, got %v", i, r.Name, r.Status)
+				}
+			}
 		}
 	})
 }
