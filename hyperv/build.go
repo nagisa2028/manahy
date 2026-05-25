@@ -104,6 +104,7 @@ func runVMsParallel(summarize Summarize, fn func(name string)) {
 // StartByStruct starts all VMs defined in the config concurrently.
 // VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are already running or not found are silently skipped.
+// VMs in a transient state (e.g. Starting) emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StartByStruct(summarize Summarize, w io.Writer) error {
 	stateMap := getVMStateMap()
@@ -112,6 +113,13 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 	runVMsParallel(summarize, func(name string) {
 		state := stateMap[name]
 		if state == vmStateRunning || state == "" {
+			return
+		}
+		if !reVMState.MatchString(state) {
+			// VM is present but in a transient state (Starting, Stopping, etc.).
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "skipping %s: VM is in transient state %q\n", name, state)
+			mu.Unlock()
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {

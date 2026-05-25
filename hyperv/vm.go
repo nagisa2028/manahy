@@ -42,7 +42,8 @@ func GetVMState(name string) string {
 }
 
 // getVMStateMap returns name→state for all VMs on the host in one PS call.
-// VMs whose state cannot be parsed are omitted; callers treat missing entries as NotFound.
+// VMs in transient states (e.g. Starting, Stopping) are included with their raw state string.
+// Missing entries should be treated as NotFound by callers.
 func getVMStateMap() map[string]string {
 	res, err := outputPS(cmdGetVM + " | Format-Table Name, State")
 	if err != nil {
@@ -51,14 +52,23 @@ func getVMStateMap() map[string]string {
 	m := make(map[string]string)
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if line == "" || isTableHeader(line) || reDashOnly.MatchString(line) {
+		if line == "" || reBlank.MatchString(line) {
 			continue
 		}
-		state := reVMState.FindString(line)
-		if state == "" {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
 			continue
 		}
-		name := strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
+		state := fields[len(fields)-1]
+		if state == "State" {
+			// Format-Table header row "Name  State" — skip.
+			continue
+		}
+		// Reconstruct the VM name as everything before the last whitespace token.
+		// strings.LastIndex handles multi-word names and names that contain the state
+		// string as a substring (Format-Table always pads name and state columns).
+		idx := strings.LastIndex(line, state)
+		name := strings.TrimSpace(line[:idx])
 		if name != "" {
 			m[name] = state
 		}

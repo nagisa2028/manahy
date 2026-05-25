@@ -164,6 +164,20 @@ func TestVmListingOfExecuteResults(t *testing.T) {
 		}
 	})
 
+	t.Run("multi-word VM name is parsed correctly", func(t *testing.T) {
+		// Previously, a VM named "Name Server" was falsely treated as a header row
+		// because the first token was "Name". After removing isTableHeader, the
+		// default:continue handles the real header, so multi-word names work.
+		input := "Name                   State\n----                   -----\nName Server            Running\n"
+		list, err := vmListingOfExecuteResults([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(list.Running) != 1 || list.Running[0] != "Name Server" {
+			t.Errorf("expected [Name Server] in Running, got %v", list.Running)
+		}
+	})
+
 	t.Run("empty input returns empty VMList and nil", func(t *testing.T) {
 		list, err := vmListingOfExecuteResults([]byte(""))
 		if err != nil {

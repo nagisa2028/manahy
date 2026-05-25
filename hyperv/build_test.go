@@ -3,6 +3,7 @@ package hyperv
 import (
 	"bytes"
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -567,11 +568,17 @@ func TestRemoveByStruct(t *testing.T) {
 
 // batchVMStateOutput returns a Format-Table Name,State output for the given
 // name→state mapping, matching the format produced by getVMStateMap's PS query.
+// Keys are sorted so the output is deterministic across test runs.
 func batchVMStateOutput(nameStates map[string]string) []byte {
+	names := make([]string, 0, len(nameStates))
+	for name := range nameStates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 	var sb strings.Builder
 	sb.WriteString("Name    State\n----    -----\n")
-	for name, state := range nameStates {
-		sb.WriteString(name + "  " + state + "\n")
+	for _, name := range names {
+		sb.WriteString(name + "  " + nameStates[name] + "\n")
 	}
 	return []byte(sb.String())
 }
@@ -623,6 +630,27 @@ func TestStartByStruct(t *testing.T) {
 		}
 		if runCalled {
 			t.Error("StartByStruct: runPS called for not-found VM")
+		}
+	})
+
+	t.Run("transient state VM is skipped with warning", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Starting"}), nil
+			},
+		)
+		var buf bytes.Buffer
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &buf); err != nil {
+			t.Fatalf("StartByStruct: expected nil for transient-state VM, got %v", err)
+		}
+		if runCalled {
+			t.Error("StartByStruct: runPS called for transient-state VM")
+		}
+		if !strings.Contains(buf.String(), "transient") {
+			t.Errorf("StartByStruct: expected transient-state warning in output, got %q", buf.String())
 		}
 	})
 

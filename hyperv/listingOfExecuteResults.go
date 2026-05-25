@@ -22,18 +22,6 @@ var (
 	reTrailNum   = regexp.MustCompile("[0-9]+$")
 )
 
-// isTableHeader reports whether line is a Format-Table header row, i.e. the
-// first whitespace-delimited token is exactly "Name".  Using a token comparison
-// instead of strings.Contains prevents false positives for VM or switch names
-// that contain the substring "Name" (e.g. "NameNode", "ManagementNet").
-func isTableHeader(line string) bool {
-	i := strings.IndexAny(line, " \t")
-	if i < 0 {
-		return line == "Name"
-	}
-	return line[:i] == "Name"
-}
-
 func listingOfExecuteResults(res []byte, flag string) []string {
 	var list []string
 	for _, line := range reSplit.Split(string(res), -1) {
@@ -49,11 +37,14 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 	var vmList VMList
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if isTableHeader(line) || reBlank.MatchString(line) {
+		if reBlank.MatchString(line) {
 			continue
 		}
 		state := reVMState.FindString(line)
 		line = strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
+		if line == "" {
+			continue
+		}
 
 		switch state {
 		case vmStateRunning:
@@ -77,11 +68,14 @@ func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 	var switchList SwitchList
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if isTableHeader(line) || reBlank.MatchString(line) {
+		if reBlank.MatchString(line) {
 			continue
 		}
 		switchType := reSwitchType.FindString(line)
 		line = strings.TrimSpace(reSwitchType.ReplaceAllString(line, ""))
+		if line == "" {
+			continue
+		}
 
 		switch switchType {
 		case "External":
