@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -63,12 +64,12 @@ func loadConfig(path string) hyperv.Summarize {
 	return config
 }
 
-// runParallel runs fn for every name concurrently.
-// Each failure is printed to stderr immediately so the user sees partial
-// results without waiting for the full batch to complete.
+// runParallel runs fn for every name concurrently, writing each failure to w.
+// Each failure is written immediately so the user sees partial results without
+// waiting for the full batch to complete.
 // Only the last error encountered is returned; callers that need to
-// distinguish individual failures should inspect the stderr output.
-func runParallel(names []string, fn func(string) error) error {
+// distinguish individual failures should inspect the w output.
+func runParallel(w io.Writer, names []string, fn func(string) error) error {
 	var (
 		wg      sync.WaitGroup
 		mu      sync.Mutex
@@ -81,7 +82,7 @@ func runParallel(names []string, fn func(string) error) error {
 			defer wg.Done()
 			if err := fn(name); err != nil {
 				mu.Lock()
-				_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", name, err)
+				_, _ = fmt.Fprintf(w, "%s: %s\n", name, err)
 				lastErr = err
 				mu.Unlock()
 			}

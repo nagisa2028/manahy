@@ -454,7 +454,7 @@ func checkMemorySize(size string) error {
 		sizeMB = n
 	}
 	if sizeMB > maxMemorySizeGB*1024 {
-		return fmt.Errorf("memory size %s exceeds maximum allowed size of 16TB", size)
+		return fmt.Errorf("memory size %s exceeds maximum allowed size of %dTB", size, maxMemorySizeGB/1024)
 	}
 	return nil
 }
