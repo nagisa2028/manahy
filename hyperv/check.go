@@ -101,7 +101,15 @@ func checkCmdlets(cmdlets []string) []CheckResult {
 	}
 	cmd := "Get-Command " + strings.Join(quoted, ",") +
 		" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name"
-	out, _ := outputPS(cmd)
+	out, err := outputPS(cmd)
+	if err != nil {
+		// PS itself failed (not found, timeout, etc.); report all cmdlets as unavailable.
+		results := make([]CheckResult, len(cmdlets))
+		for i, c := range cmdlets {
+			results[i] = CheckResult{Name: c, Status: CheckFail, Message: "PS unavailable"}
+		}
+		return results
+	}
 	found := make(map[string]bool, len(cmdlets))
 	for _, line := range reSplit.Split(string(out), -1) {
 		if line := strings.TrimSpace(line); line != "" {

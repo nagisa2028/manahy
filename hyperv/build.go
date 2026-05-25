@@ -102,14 +102,16 @@ func runVMsParallel(summarize Summarize, fn func(name string)) {
 }
 
 // StartByStruct starts all VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are already running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StartByStruct(summarize Summarize, w io.Writer) error {
+	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		state := GetVMState(name)
-		if state == vmStateRunning || state == vmStateNotFound {
+		state := stateMap[name]
+		if state == vmStateRunning || state == "" {
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
@@ -123,13 +125,15 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // StopByStruct gracefully stops all VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StopByStruct(summarize Summarize, w io.Writer) error {
+	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		if stateMap[name] != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
@@ -143,13 +147,15 @@ func StopByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // RestartByStruct restarts all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func RestartByStruct(summarize Summarize, w io.Writer) error {
+	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		if stateMap[name] != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
@@ -163,13 +169,15 @@ func RestartByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // SaveByStruct saves the state of all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func SaveByStruct(summarize Summarize, w io.Writer) error {
+	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		if stateMap[name] != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {
@@ -183,13 +191,15 @@ func SaveByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // ResumeByStruct resumes all saved VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not in saved state or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func ResumeByStruct(summarize Summarize, w io.Writer) error {
+	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateSaved {
+		if stateMap[name] != vmStateSaved {
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {

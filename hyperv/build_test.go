@@ -565,12 +565,25 @@ func TestRemoveByStruct(t *testing.T) {
 
 // --- StartByStruct / StopByStruct ---
 
+// batchVMStateOutput returns a Format-Table Name,State output for the given
+// name→state mapping, matching the format produced by getVMStateMap's PS query.
+func batchVMStateOutput(nameStates map[string]string) []byte {
+	var sb strings.Builder
+	sb.WriteString("Name    State\n----    -----\n")
+	for name, state := range nameStates {
+		sb.WriteString(name + "  " + state + "\n")
+	}
+	return []byte(sb.String())
+}
+
 func TestStartByStruct(t *testing.T) {
 	t.Run("off VM is started", func(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -585,7 +598,9 @@ func TestStartByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -623,7 +638,11 @@ func TestStartByStruct(t *testing.T) {
 				mu.Unlock()
 				return nil
 			},
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{
+					"router1": "Off", "router2": "Off", "router3": "Off",
+				}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 3}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -652,7 +671,9 @@ func TestStopByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
@@ -667,7 +688,9 @@ func TestStopByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
@@ -684,7 +707,9 @@ func TestRestartByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -699,7 +724,9 @@ func TestRestartByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -716,7 +743,9 @@ func TestSaveByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
@@ -731,7 +760,9 @@ func TestSaveByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
@@ -748,7 +779,9 @@ func TestResumeByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Saved"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
@@ -763,7 +796,9 @@ func TestResumeByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
@@ -778,17 +813,33 @@ func TestResumeByStruct(t *testing.T) {
 // TestByStructConcurrent verifies that the parallel ByStruct functions are race-free.
 // Run with -race to detect data races.
 func TestByStructConcurrent(t *testing.T) {
+	// multiConfig has alpha(1) + beta(3) = 4 instances: alpha, beta1, beta2, beta3.
 	multiConfig := Summarize{
 		Vms: map[string]VM{
 			"alpha": {Count: 1},
 			"beta":  {Count: 3},
 		},
 	}
+	multiOff := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Off", "beta1": "Off", "beta2": "Off", "beta3": "Off",
+		})
+	}
+	multiRunning := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Running", "beta1": "Running", "beta2": "Running", "beta3": "Running",
+		})
+	}
+	multiSaved := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Saved", "beta1": "Saved", "beta2": "Saved", "beta3": "Saved",
+		})
+	}
 
 	t.Run("StartByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) { return multiOff(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := StartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -800,7 +851,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("StopByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := StopByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -812,7 +863,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("RestartByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := RestartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -824,7 +875,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("SaveByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := SaveByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -836,7 +887,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("ResumeByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+			func(_ string) ([]byte, error) { return multiSaved(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := ResumeByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -857,7 +908,11 @@ func TestByStructConcurrent(t *testing.T) {
 				mu.Unlock()
 				return errors.New("simulated error")
 			},
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{
+					"router1": "Off", "router2": "Off", "router3": "Off", "router4": "Off",
+				}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 4}}}
 		err := StartByStruct(config, &bytes.Buffer{})

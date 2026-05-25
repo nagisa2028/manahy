@@ -51,7 +51,7 @@ func getVMStateMap() map[string]string {
 	m := make(map[string]string)
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.Contains(line, "Name") || reDashOnly.MatchString(line) {
+		if line == "" || isTableHeader(line) || reDashOnly.MatchString(line) {
 			continue
 		}
 		state := reVMState.FindString(line)
@@ -131,6 +131,7 @@ func SetVMHardDisk(name string, disks []string) error {
 		}
 	}
 	var sb strings.Builder
+	sb.WriteString("$ErrorActionPreference = 'Stop'; ")
 	for i, disk := range disks {
 		if i > 0 {
 			sb.WriteString("; ")
@@ -169,6 +170,7 @@ func SetVMSwitch(name string, networks []string) error {
 		}
 	}
 	var sb strings.Builder
+	sb.WriteString("$ErrorActionPreference = 'Stop'; ")
 	for i, network := range networks {
 		if i > 0 {
 			sb.WriteString("; ")

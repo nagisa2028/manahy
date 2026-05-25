@@ -63,7 +63,8 @@ func loadConfig(path string) hyperv.Summarize {
 	return config
 }
 
-// runParallel runs fn for every name concurrently and returns the last error.
+// runParallel runs fn for every name concurrently.
+// Each failure is printed to stderr immediately; the last error is returned.
 func runParallel(names []string, fn func(string) error) error {
 	var (
 		wg      sync.WaitGroup
@@ -77,6 +78,7 @@ func runParallel(names []string, fn func(string) error) error {
 			defer wg.Done()
 			if err := fn(name); err != nil {
 				mu.Lock()
+				_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", name, err)
 				lastErr = err
 				mu.Unlock()
 			}

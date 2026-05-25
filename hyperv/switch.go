@@ -51,7 +51,7 @@ func getSwitchTypeMap() map[string]string {
 	m := make(map[string]string)
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.Contains(line, "Name") || reDashOnly.MatchString(line) {
+		if line == "" || isTableHeader(line) || reDashOnly.MatchString(line) {
 			continue
 		}
 		switchType := reSwitchType.FindString(line)
