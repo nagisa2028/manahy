@@ -83,8 +83,8 @@ disks:
 	})
 
 	t.Run("VM not on host shown as NotFound", func(t *testing.T) {
-		withPS(t, nil, makeHook("Off", "Internal", false))
-		// makeHook returns "test-vm Off"; to simulate a missing VM we use an empty batch response.
+		// Use an empty batch Get-VM response to simulate a VM that exists in the
+		// config but is not present on the host.
 		withPS(t, nil, func(cmd string) ([]byte, error) {
 			if strings.Contains(cmd, "Get-VMSwitch") {
 				return []byte("Name        SwitchType\n----        ----------\ntest-switch Internal\n"), nil

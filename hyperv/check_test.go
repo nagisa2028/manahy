@@ -232,9 +232,7 @@ func TestCheckCmdletsBatch(t *testing.T) {
 	})
 
 	t.Run("empty input returns nil", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte(""), nil
-		})
+		// checkCmdlets(nil) returns early before any PS call; no hook needed.
 		if results := checkCmdlets(nil); results != nil {
 			t.Errorf("checkCmdlets(nil): expected nil, got %v", results)
 		}
