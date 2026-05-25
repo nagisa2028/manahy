@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
@@ -25,6 +26,8 @@ func newStackCmd(configFile *string) *cobra.Command {
 		newStackRestartCmd(configFile),
 		newStackSaveCmd(configFile),
 		newStackResumeCmd(configFile),
+		newStackSuspendCmd(configFile),
+		newStackDestroyCmd(configFile),
 	)
 	return cmd
 }
@@ -130,7 +133,8 @@ func newStackListCmd(configFile *string) *cobra.Command {
 }
 
 func newStackStartCmd(configFile *string) *cobra.Command {
-	return &cobra.Command{
+	var progress bool
+	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "start all VMs defined in config file",
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -138,17 +142,24 @@ func newStackStartCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := hyperv.StartByStruct(data, os.Stderr); err != nil {
-				// Per-VM failures already written to stderr by StartByStruct.
-				return fmt.Errorf("one or more VMs failed to start")
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
 			}
-			return nil
+			return withStackProgress(pw, "start", data, func() error {
+				if err := hyperv.StartByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to start")
+				}
+				return nil
+			})
 		},
 	}
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
+	return cmd
 }
 
 func newStackStopCmd(configFile *string) *cobra.Command {
-	var force bool
+	var force, progress bool
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "stop all VMs defined in config file",
@@ -160,19 +171,25 @@ func newStackStopCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Stop all VMs defined in "+path+"?", force) {
 				return nil
 			}
-			if err := hyperv.StopByStruct(data, os.Stderr); err != nil {
-				// Per-VM failures already written to stderr by StopByStruct.
-				return fmt.Errorf("one or more VMs failed to stop")
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
 			}
-			return nil
+			return withStackProgress(pw, "stop", data, func() error {
+				if err := hyperv.StopByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to stop")
+				}
+				return nil
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
 	return cmd
 }
 
 func newStackRestartCmd(configFile *string) *cobra.Command {
-	var force bool
+	var force, progress bool
 	cmd := &cobra.Command{
 		Use:   "restart",
 		Short: "restart all running VMs defined in config file",
@@ -184,19 +201,25 @@ func newStackRestartCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Restart all running VMs defined in "+path+"?", force) {
 				return nil
 			}
-			if err := hyperv.RestartByStruct(data, os.Stderr); err != nil {
-				// Per-VM failures already written to stderr by RestartByStruct.
-				return fmt.Errorf("one or more VMs failed to restart")
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
 			}
-			return nil
+			return withStackProgress(pw, "restart", data, func() error {
+				if err := hyperv.RestartByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to restart")
+				}
+				return nil
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
 	return cmd
 }
 
 func newStackSaveCmd(configFile *string) *cobra.Command {
-	var force bool
+	var force, progress bool
 	cmd := &cobra.Command{
 		Use:   "save",
 		Short: "save state of all running VMs defined in config file",
@@ -208,19 +231,26 @@ func newStackSaveCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Save state of all running VMs defined in "+path+"?", force) {
 				return nil
 			}
-			if err := hyperv.SaveByStruct(data, os.Stderr); err != nil {
-				// Per-VM failures already written to stderr by SaveByStruct.
-				return fmt.Errorf("one or more VMs failed to save")
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
 			}
-			return nil
+			return withStackProgress(pw, "save", data, func() error {
+				if err := hyperv.SaveByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to save")
+				}
+				return nil
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
 	return cmd
 }
 
 func newStackResumeCmd(configFile *string) *cobra.Command {
-	return &cobra.Command{
+	var progress bool
+	cmd := &cobra.Command{
 		Use:   "resume",
 		Short: "resume all saved VMs defined in config file",
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -228,11 +258,78 @@ func newStackResumeCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := hyperv.ResumeByStruct(data, os.Stderr); err != nil {
-				// Per-VM failures already written to stderr by ResumeByStruct.
-				return fmt.Errorf("one or more VMs failed to resume")
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
 			}
-			return nil
+			return withStackProgress(pw, "resume", data, func() error {
+				if err := hyperv.ResumeByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to resume")
+				}
+				return nil
+			})
 		},
 	}
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
+	return cmd
+}
+
+func newStackSuspendCmd(configFile *string) *cobra.Command {
+	var force, progress bool
+	cmd := &cobra.Command{
+		Use:   "suspend",
+		Short: "pause all running VMs defined in config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path, data, err := loadStack(configFile)
+			if err != nil {
+				return err
+			}
+			if !confirmAction("Suspend all running VMs defined in "+path+"?", force) {
+				return nil
+			}
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
+			}
+			return withStackProgress(pw, "suspend", data, func() error {
+				if err := hyperv.SuspendByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to suspend")
+				}
+				return nil
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
+	return cmd
+}
+
+func newStackDestroyCmd(configFile *string) *cobra.Command {
+	var force, progress bool
+	cmd := &cobra.Command{
+		Use:   "destroy",
+		Short: "force-stop all running VMs defined in config file",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path, data, err := loadStack(configFile)
+			if err != nil {
+				return err
+			}
+			if !confirmAction("Force-stop (destroy) all running VMs defined in "+path+"?", force) {
+				return nil
+			}
+			var pw io.Writer
+			if progress {
+				pw = os.Stderr
+			}
+			return withStackProgress(pw, "destroy", data, func() error {
+				if err := hyperv.DestroyByStruct(data, os.Stderr); err != nil {
+					return fmt.Errorf("one or more VMs failed to be destroyed")
+				}
+				return nil
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&progress, "progress", false, "print progress messages to stderr")
+	return cmd
 }

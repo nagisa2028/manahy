@@ -8,14 +8,18 @@ import (
 )
 
 // UnmarshalYaml reads and parses a manahy YAML configuration file.
+// Environment variables in the form ${VAR} or $VAR are expanded before parsing.
 func UnmarshalYaml(name string) (Summarize, error) {
 	buf, err := loadFile(name)
 	if err != nil {
 		return Summarize{}, err
 	}
 
+	// Expand $VAR and ${VAR} references in the config before unmarshalling.
+	expanded := []byte(os.ExpandEnv(string(buf)))
+
 	var data Summarize
-	if err = yaml.Unmarshal(buf, &data); err != nil {
+	if err = yaml.Unmarshal(expanded, &data); err != nil {
 		return Summarize{}, err
 	}
 	return data, nil

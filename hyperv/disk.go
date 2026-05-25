@@ -180,3 +180,15 @@ func MergeVHD(path, destPath string) error {
 	}
 	return runPSLong(cmd)
 }
+
+// CloneDisk creates a new VHD by copying an existing one using New-VHD -SourcePath.
+// The source must exist; the destination must not.
+func CloneDisk(srcPath, destPath string) error {
+	if err := isFileExist(srcPath); err != nil {
+		return fmt.Errorf("source disk: %w", err)
+	}
+	if err := isNotFileExist(destPath); err != nil {
+		return fmt.Errorf("destination disk: %w", err)
+	}
+	return runPSLong(cmdNewVHD + " -Path " + ps(destPath) + " -SourcePath " + ps(srcPath))
+}

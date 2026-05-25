@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -40,6 +41,7 @@ func newVMCmd(configFile *string) *cobra.Command {
 		newVMNicCmd(),
 		newVMHardDiskCmd(configFile),
 		newVMDvdCmd(configFile),
+		newVMNotesCmd(),
 	)
 	return cmd
 }
@@ -52,6 +54,8 @@ func newVMListCmd() *cobra.Command {
 		paused   bool
 		all      bool
 		state    string
+		jsonOut  bool
+		quiet    bool
 	}{active: true}
 	c := &cobra.Command{
 		Use:   "list",
@@ -62,36 +66,80 @@ func newVMListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// --state takes precedence over individual flags
+
+			type vmGroup struct {
+				state string
+				names []string
+			}
+			// Determine which groups to include.
+			var groups []vmGroup
+
 			if opts.state != "" {
 				switch opts.state {
 				case "running":
-					displayList(vmList.Running, "Running VM's")
+					groups = append(groups, vmGroup{"running", vmList.Running})
 				case "saved":
-					displayList(vmList.Saved, "Saved VM's")
+					groups = append(groups, vmGroup{"saved", vmList.Saved})
 				case "paused":
-					displayList(vmList.Paused, "Paused VM's")
+					groups = append(groups, vmGroup{"paused", vmList.Paused})
 				case "off":
-					displayList(vmList.Off, "Inactive VM's")
+					groups = append(groups, vmGroup{"off", vmList.Off})
 				default:
 					return fmt.Errorf("unknown state %q: use running, saved, paused, or off", opts.state)
 				}
+			} else {
+				if opts.saved || opts.inactive || opts.paused || opts.all {
+					opts.active = false
+				}
+				if opts.active || opts.all {
+					groups = append(groups, vmGroup{"running", vmList.Running})
+				}
+				if opts.saved || opts.all {
+					groups = append(groups, vmGroup{"saved", vmList.Saved})
+				}
+				if opts.paused || opts.all {
+					groups = append(groups, vmGroup{"paused", vmList.Paused})
+				}
+				if opts.inactive || opts.all {
+					groups = append(groups, vmGroup{"off", vmList.Off})
+				}
+			}
+
+			if opts.jsonOut {
+				// Build a map[state][]name and marshal to JSON.
+				out := make(map[string][]string, len(groups))
+				for _, g := range groups {
+					if len(g.names) > 0 {
+						out[g.state] = g.names
+					}
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				return enc.Encode(out)
+			}
+
+			if opts.quiet {
+				// Print each VM name on its own line, no headers.
+				for _, g := range groups {
+					for _, name := range g.names {
+						fmt.Println(name)
+					}
+				}
 				return nil
 			}
-			if opts.saved || opts.inactive || opts.paused || opts.all {
-				opts.active = false
-			}
-			if opts.active || opts.all {
-				displayList(vmList.Running, "Running VM's")
-			}
-			if opts.saved || opts.all {
-				displayList(vmList.Saved, "Saved VM's")
-			}
-			if opts.paused || opts.all {
-				displayList(vmList.Paused, "Paused VM's")
-			}
-			if opts.inactive || opts.all {
-				displayList(vmList.Off, "Inactive VM's")
+
+			// Default: human-readable grouped output.
+			for _, g := range groups {
+				switch g.state {
+				case "running":
+					displayList(g.names, "Running VM's")
+				case "saved":
+					displayList(g.names, "Saved VM's")
+				case "paused":
+					displayList(g.names, "Paused VM's")
+				case "off":
+					displayList(g.names, "Inactive VM's")
+				}
 			}
 			return nil
 		},
@@ -102,6 +150,8 @@ func newVMListCmd() *cobra.Command {
 	c.Flags().BoolVarP(&opts.paused, "paused", "p", false, "list paused vm's")
 	c.Flags().BoolVarP(&opts.all, "all", "a", false, "list all vm's")
 	c.Flags().StringVar(&opts.state, "state", "", "filter by state: running, saved, paused, off")
+	c.Flags().BoolVar(&opts.jsonOut, "json", false, "output as JSON")
+	c.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "print VM names only, one per line")
 	return c
 }
 
@@ -445,5 +495,20 @@ func newVMIntegrationDisableCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVarP(&name, "name", "n", "", "integration service name")
+	return c
+}
+
+func newVMNotesCmd() *cobra.Command {
+	var notes string
+	c := &cobra.Command{
+		Use:   "notes <vm-name>",
+		Short: "set the notes/description field of a VM",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return hyperv.SetVMNotes(args[0], notes)
+		},
+	}
+	c.Flags().StringVarP(&notes, "notes", "n", "", "notes text to set on the VM")
+	_ = c.MarkFlagRequired("notes")
 	return c
 }

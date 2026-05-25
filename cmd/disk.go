@@ -17,6 +17,7 @@ func newDiskCmd(configFile *string) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newDiskCreateCmd(),
+		newDiskCloneCmd(configFile),
 		newDiskRemoveCmd(configFile),
 		newDiskInfoCmd(configFile),
 		newDiskResizeCmd(configFile),
@@ -169,5 +170,21 @@ func newDiskMergeCmd(configFile *string) *cobra.Command {
 		},
 	}
 	c.Flags().StringVarP(&dest, "dest", "d", "", "destination path (default: merge into parent)")
+	return c
+}
+
+func newDiskCloneCmd(configFile *string) *cobra.Command {
+	var dest string
+	c := &cobra.Command{
+		Use:   "clone <source>",
+		Short: "clone a VHD to a new path",
+		Args:  cobra.RangeArgs(1, 1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			src := resolveDisk(loadConfig(*configFile), args[0])
+			return hyperv.CloneDisk(src, dest)
+		},
+	}
+	c.Flags().StringVarP(&dest, "dest", "d", "", "destination path for the cloned VHD")
+	_ = c.MarkFlagRequired("dest")
 	return c
 }

@@ -129,7 +129,27 @@ func SetVMMemory(name string, memory Memory) error {
 	cmd += " -StartupBytes " + memory.Size
 	cmd += " -DynamicMemoryEnabled $" + strconv.FormatBool(memory.Dynamic)
 
+	if memory.Dynamic {
+		if memory.Min != "" {
+			cmd += " -MinimumBytes " + memory.Min
+		}
+		if memory.Max != "" {
+			cmd += " -MaximumBytes " + memory.Max
+		}
+		if memory.Buffer > 0 {
+			cmd += " -Buffer " + strconv.Itoa(memory.Buffer)
+		}
+	}
+
 	return runPS(cmd)
+}
+
+// SetVMNotes sets the notes/description field of a VM.
+func SetVMNotes(name, notes string) error {
+	if err := IsVMExist(name); err != nil {
+		return err
+	}
+	return runPS("Set-VM -Name " + ps(name) + " -Notes " + ps(notes))
 }
 
 // SetVMHardDisk attaches hard disk drives to a VM.
@@ -208,6 +228,42 @@ func SetVMSwitch(name string, networks []string) error {
 	return runPS(sb.String())
 }
 
+// SetVMSwitchWithRefs attaches network adapters described by NetworkRef entries to a VM.
+// Each ref may specify a switch name, an optional adapter name, and an optional VLAN ID.
+// Switch existence is validated in a single batch PS call before any adapter is added.
+func SetVMSwitchWithRefs(name string, refs []NetworkRef) error {
+	if len(refs) == 0 {
+		return nil
+	}
+	typeMap, err := getSwitchTypeMap()
+	if err != nil {
+		return err
+	}
+	for _, ref := range refs {
+		if typeMap[ref.Switch] == "" {
+			return fmt.Errorf("switch %s does not exist", ref.Switch)
+		}
+	}
+	for i, ref := range refs {
+		adapterName := ref.Name
+		if adapterName == "" {
+			adapterName = "Network Adapter " + strconv.Itoa(i+1)
+		}
+		addCmd := cmdAddVMNetworkAdapter + " -VMName " + ps(name) +
+			" -Name " + ps(adapterName) +
+			" -SwitchName " + ps(ref.Switch)
+		if err := runPS(addCmd); err != nil {
+			return fmt.Errorf("failed to add adapter %s to VM %s: %w", adapterName, name, err)
+		}
+		if ref.VLAN != 0 {
+			if err := SetVMNetworkAdapterVlan(name, adapterName, ref.VLAN); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // CreateVM creates a new VM with the specified configuration.
 func CreateVM(newVM VM, output bool) error {
 	err := checkVMParam(newVM)
@@ -252,10 +308,26 @@ func CreateVM(newVM VM, output bool) error {
 		}
 	}
 
-	err = SetVMSwitch(newVM.Name, newVM.Networks)
-	printError("Set VMSwitch", err, output)
-	if err != nil {
-		return err
+	if len(newVM.NetworkRefs) > 0 {
+		err = SetVMSwitchWithRefs(newVM.Name, newVM.NetworkRefs)
+		printError("Set VMSwitch", err, output)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = SetVMSwitch(newVM.Name, newVM.Networks)
+		printError("Set VMSwitch", err, output)
+		if err != nil {
+			return err
+		}
+	}
+
+	if newVM.Notes != "" {
+		err = SetVMNotes(newVM.Name, newVM.Notes)
+		printError("Set Notes", err, output)
+		if err != nil {
+			return err
+		}
 	}
 
 	if newVM.Generation == maxVMGeneration && newVM.SecureBoot != nil {

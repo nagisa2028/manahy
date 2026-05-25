@@ -100,3 +100,29 @@ func resolveDisk(config hyperv.Summarize, arg string) string {
 	}
 	return arg
 }
+
+// withStackProgress wraps a stack operation with optional progress reporting.
+// When w is non-nil it prints "label: processing N VM(s)..." before calling fn
+// and "label: done" or "label: finished with errors" after.
+// When w is nil it simply calls fn.
+func withStackProgress(w io.Writer, label string, data hyperv.Summarize, fn func() error) error {
+	if w == nil {
+		return fn()
+	}
+	total := 0
+	for _, vm := range data.Vms {
+		c := vm.Count
+		if c <= 0 {
+			c = 1
+		}
+		total += c
+	}
+	fmt.Fprintf(w, "%s: processing %d VM(s)...\n", label, total)
+	err := fn()
+	if err != nil {
+		fmt.Fprintf(w, "%s: finished with errors\n", label)
+	} else {
+		fmt.Fprintf(w, "%s: done\n", label)
+	}
+	return err
+}

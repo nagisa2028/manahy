@@ -31,6 +31,7 @@ func newRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "print each PowerShell command before execution")
 	cmd.AddCommand(
 		newVersionCmd(),
+		newValidateCmd(),
 		newStackCmd(&configFile),
 		newVMCmd(&configFile),
 		newSwitchCmd(),

@@ -1348,3 +1348,103 @@ func TestRemoveVMRunPSFailure(t *testing.T) {
 		t.Fatal("RemoveVM: expected error from runPS, got nil")
 	}
 }
+
+// ---------- SetVMMemory with dynamic min/max/buffer ----------
+
+func TestSetVMMemoryDynamicOptions(t *testing.T) {
+	t.Run("dynamic with min and max includes MinimumBytes and MaximumBytes", func(t *testing.T) {
+		var capturedCmd string
+		callCount := 0
+		withPS(t,
+			func(c string) error {
+				capturedCmd = c
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					// GetVMState call inside IsVMExist
+					return stateOutput("Running"), nil
+				}
+				return nil, nil
+			},
+		)
+		mem := Memory{Size: "1GB", Dynamic: true, Min: "512MB", Max: "4GB"}
+		if err := SetVMMemory("vm1", mem); err != nil {
+			t.Fatalf("SetVMMemory: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-MinimumBytes") {
+			t.Errorf("SetVMMemory: command %q missing -MinimumBytes", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "-MaximumBytes") {
+			t.Errorf("SetVMMemory: command %q missing -MaximumBytes", capturedCmd)
+		}
+		if strings.Contains(capturedCmd, "-Buffer") {
+			t.Errorf("SetVMMemory: command %q should not contain -Buffer when buffer=0", capturedCmd)
+		}
+	})
+
+	t.Run("dynamic with buffer includes -Buffer", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		mem := Memory{Size: "2GB", Dynamic: true, Buffer: 20}
+		if err := SetVMMemory("vm1", mem); err != nil {
+			t.Fatalf("SetVMMemory: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "-Buffer 20") {
+			t.Errorf("SetVMMemory: command %q does not contain '-Buffer 20'", capturedCmd)
+		}
+	})
+
+	t.Run("non-dynamic with min set does NOT include MinimumBytes", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		mem := Memory{Size: "1GB", Dynamic: false, Min: "512MB"}
+		if err := SetVMMemory("vm1", mem); err != nil {
+			t.Fatalf("SetVMMemory: expected nil, got %v", err)
+		}
+		if strings.Contains(capturedCmd, "-MinimumBytes") {
+			t.Errorf("SetVMMemory: static memory command %q should not contain -MinimumBytes", capturedCmd)
+		}
+	})
+}
+
+// ---------- SetVMNotes ----------
+
+func TestSetVMNotes(t *testing.T) {
+	t.Run("vm exists calls Set-VM with -Notes", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := SetVMNotes("vm1", "my test notes"); err != nil {
+			t.Fatalf("SetVMNotes: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "Set-VM") {
+			t.Errorf("SetVMNotes: command %q does not contain 'Set-VM'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "-Notes") {
+			t.Errorf("SetVMNotes: command %q does not contain '-Notes'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, "my test notes") {
+			t.Errorf("SetVMNotes: command %q does not contain the notes text", capturedCmd)
+		}
+	})
+
+	t.Run("vm not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return stateOutput("NotFound"), nil
+		})
+		err := SetVMNotes("missing-vm", "notes")
+		if err == nil {
+			t.Fatal("SetVMNotes: expected error for missing VM, got nil")
+		}
+	})
+}

@@ -706,3 +706,68 @@ func TestCheckDiskSizeGBBoundary(t *testing.T) {
 		}
 	})
 }
+
+// ---------- CloneDisk ----------
+
+func TestCloneDisk(t *testing.T) {
+	t.Run("source exists and dest absent calls runPS with SourcePath", func(t *testing.T) {
+		var capturedCmd string
+		callCount := 0
+		withPS(t,
+			func(c string) error {
+				capturedCmd = c
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					return []byte("True\n"), nil // source exists
+				}
+				return []byte("False\n"), nil // dest does not exist
+			},
+		)
+		if err := CloneDisk(`C:\src.vhdx`, `C:\clone.vhdx`); err != nil {
+			t.Fatalf("CloneDisk: expected nil, got %v", err)
+		}
+		if !strings.Contains(capturedCmd, "SourcePath") {
+			t.Errorf("CloneDisk: command %q does not contain 'SourcePath'", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, `C:\src.vhdx`) {
+			t.Errorf("CloneDisk: command %q does not contain source path", capturedCmd)
+		}
+		if !strings.Contains(capturedCmd, `C:\clone.vhdx`) {
+			t.Errorf("CloneDisk: command %q does not contain dest path", capturedCmd)
+		}
+	})
+
+	t.Run("source missing returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("False\n"), nil // source missing
+		})
+		err := CloneDisk(`C:\missing.vhdx`, `C:\clone.vhdx`)
+		if err == nil {
+			t.Fatal("CloneDisk: expected error for missing source, got nil")
+		}
+		if !strings.Contains(err.Error(), "source disk") {
+			t.Errorf("CloneDisk: error %q does not mention 'source disk'", err.Error())
+		}
+	})
+
+	t.Run("dest already exists returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return []byte("True\n"), nil // source exists
+			}
+			return []byte("True\n"), nil // dest already exists
+		})
+		err := CloneDisk(`C:\src.vhdx`, `C:\existing.vhdx`)
+		if err == nil {
+			t.Fatal("CloneDisk: expected error for existing dest, got nil")
+		}
+		if !strings.Contains(err.Error(), "destination disk") {
+			t.Errorf("CloneDisk: error %q does not mention 'destination disk'", err.Error())
+		}
+	})
+}

@@ -91,13 +91,27 @@ func vmInstanceNames(key string, vm VM) []string {
 // runVMsParallel launches one goroutine per VM instance in summarize, calling fn for each.
 // All instances run concurrently; the helper waits for all to finish.
 func runVMsParallel(summarize Summarize, fn func(name string)) {
-	var wg sync.WaitGroup
+	runVMsParallelProgress(summarize, nil, fn)
+}
+
+// runVMsParallelProgress is like runVMsParallel but writes "name: processing..."
+// to progress before each operation if progress is non-nil.
+func runVMsParallelProgress(summarize Summarize, progress io.Writer, fn func(name string)) {
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
 	for key, vm := range summarize.Vms {
 		for _, name := range vmInstanceNames(key, vm) {
 			name := name
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				if progress != nil {
+					mu.Lock()
+					_, _ = fmt.Fprintf(progress, "%s: processing...\n", name)
+					mu.Unlock()
+				}
 				fn(name)
 			}()
 		}
@@ -403,4 +417,64 @@ func numberPath(path string, n int) string {
 		return path + strconv.Itoa(n)
 	}
 	return path[:dot] + strconv.Itoa(n) + path[dot:]
+}
+
+// SuspendByStruct pauses all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
+// VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func SuspendByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
+	var mu sync.Mutex
+	var lastErr error
+	runVMsParallel(summarize, func(name string) {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
+			return
+		}
+		if err := runPS(cmdSuspendVM + " -Name " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to suspend %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
+	return lastErr
+}
+
+// DestroyByStruct force-stops all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
+// VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
+// Partial failures are written to w; the last error encountered is returned.
+func DestroyByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
+	var mu sync.Mutex
+	var lastErr error
+	runVMsParallel(summarize, func(name string) {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
+			return
+		}
+		if err := runPS(cmdStopVM + " -Force -Name " + ps(name)); err != nil {
+			mu.Lock()
+			_, _ = fmt.Fprintf(w, "failed to destroy %s: %s\n", name, err)
+			lastErr = err
+			mu.Unlock()
+		}
+	})
+	return lastErr
 }
