@@ -34,10 +34,14 @@ func BuildByStruct(summarize Summarize) error {
 
 	for key, network := range summarize.Networks {
 		network.Name = key
-		if GetSwitchType(network.Name) == vmStateNotFound {
+		switch GetSwitchType(network.Name) {
+		case vmStateNotFound:
 			if err := CreateSwitch(network, true); err != nil {
 				return err
 			}
+		case vmStateUnknown:
+			return fmt.Errorf("failed to query state of switch %s", network.Name)
+		// default: switch exists, skip
 		}
 	}
 
@@ -107,7 +111,10 @@ func runVMsParallel(summarize Summarize, fn func(name string)) {
 // VMs in a transient state (e.g. Starting) emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StartByStruct(summarize Summarize, w io.Writer) error {
-	stateMap := getVMStateMap()
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
@@ -151,7 +158,10 @@ func skipIfTransient(state, name string, w io.Writer, mu *sync.Mutex) bool {
 // VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StopByStruct(summarize Summarize, w io.Writer) error {
-	stateMap := getVMStateMap()
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
@@ -178,7 +188,10 @@ func StopByStruct(summarize Summarize, w io.Writer) error {
 // VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func RestartByStruct(summarize Summarize, w io.Writer) error {
-	stateMap := getVMStateMap()
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
@@ -205,7 +218,10 @@ func RestartByStruct(summarize Summarize, w io.Writer) error {
 // VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func SaveByStruct(summarize Summarize, w io.Writer) error {
-	stateMap := getVMStateMap()
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
@@ -231,7 +247,10 @@ func SaveByStruct(summarize Summarize, w io.Writer) error {
 // VMs that are not in saved state or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func ResumeByStruct(summarize Summarize, w io.Writer) error {
-	stateMap := getVMStateMap()
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
@@ -318,6 +337,20 @@ func resolveAndCreateDisks(summarize Summarize, refs []string, index, count int)
 			continue
 		}
 		if disk.Import || count == 1 {
+			if !disk.Import {
+				// Create the disk idempotently — it may have been skipped in the
+				// BuildByStruct top-level pass if another VM with count>1 references
+				// this alias.
+				exists, err := searchFilePath(disk.Path)
+				if err != nil {
+					return nil, err
+				}
+				if !exists {
+					if err := CreateDisk(disk, true); err != nil {
+						return nil, err
+					}
+				}
+			}
 			paths[i] = disk.Path
 			continue
 		}

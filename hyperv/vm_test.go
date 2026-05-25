@@ -343,7 +343,7 @@ func TestSetVMSwitch(t *testing.T) {
 		}
 	})
 
-	t.Run("switch not found returns error", func(t *testing.T) {
+	t.Run("PS failure querying switches returns error", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return nil, errors.New("not found")
 		})
@@ -351,8 +351,8 @@ func TestSetVMSwitch(t *testing.T) {
 		if err == nil {
 			t.Fatal("SetVMSwitch: expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "does not exist") {
-			t.Errorf("SetVMSwitch: error %q does not contain 'does not exist'", err.Error())
+		if !strings.Contains(err.Error(), "failed to query switch types") {
+			t.Errorf("SetVMSwitch: error %q does not contain 'failed to query switch types'", err.Error())
 		}
 	})
 
@@ -976,7 +976,10 @@ func TestGetVMStateMap(t *testing.T) {
 				"RunningServer  Running\n" +
 				"my-Saved-backup  Saved\n"), nil
 		})
-		m := getVMStateMap()
+		m, err := getVMStateMap()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if m["vm-Off-test"] != "Off" {
 			t.Errorf("vm-Off-test: got %q, want %q", m["vm-Off-test"], "Off")
 		}
@@ -992,7 +995,10 @@ func TestGetVMStateMap(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte("Name    State\n----    -----\nstartup-vm  Starting\n"), nil
 		})
-		m := getVMStateMap()
+		m, err := getVMStateMap()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if m["startup-vm"] != "Starting" {
 			t.Errorf("startup-vm: got %q, want %q", m["startup-vm"], "Starting")
 		}
@@ -1002,19 +1008,22 @@ func TestGetVMStateMap(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return []byte("Name    State\n----    -----\nName Server  Running\n"), nil
 		})
-		m := getVMStateMap()
+		m, err := getVMStateMap()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if m["Name Server"] != "Running" {
 			t.Errorf("Name Server: got %q, want %q", m["Name Server"], "Running")
 		}
 	})
 
-	t.Run("PS error returns empty map", func(t *testing.T) {
+	t.Run("PS error returns error", func(t *testing.T) {
 		withPS(t, nil, func(_ string) ([]byte, error) {
 			return nil, errors.New("ps unavailable")
 		})
-		m := getVMStateMap()
-		if len(m) != 0 {
-			t.Errorf("expected empty map on PS error, got %v", m)
+		_, err := getVMStateMap()
+		if err == nil {
+			t.Error("expected error on PS failure, got nil")
 		}
 	})
 }
@@ -1036,21 +1045,37 @@ func TestConnectVM(t *testing.T) {
 		}
 	})
 
-	t.Run("non-running VM returns error without runPS", func(t *testing.T) {
+	t.Run("non-running (Off) VM calls runPS", func(t *testing.T) {
+		// ConnectVM now uses IsVMExist instead of requiring Running state, so
+		// vmconnect is attempted for any existing VM (Running, Paused, Off, Saved).
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
 			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
 		)
+		if err := ConnectVM("my-vm"); err != nil {
+			t.Fatalf("ConnectVM: expected nil for Off VM, got %v", err)
+		}
+		if !runCalled {
+			t.Error("ConnectVM: runPS was not called for existing Off VM")
+		}
+	})
+
+	t.Run("not-found VM returns error without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+		)
 		err := ConnectVM("my-vm")
 		if err == nil {
-			t.Fatal("ConnectVM: expected error, got nil")
+			t.Fatal("ConnectVM: expected error for not-found VM, got nil")
 		}
-		if !strings.Contains(err.Error(), "not running") {
-			t.Errorf("ConnectVM: error %q does not contain 'not running'", err.Error())
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("ConnectVM: error %q does not contain 'does not exist'", err.Error())
 		}
 		if runCalled {
-			t.Error("ConnectVM: runPS should not be called when VM is not running")
+			t.Error("ConnectVM: runPS should not be called when VM does not exist")
 		}
 	})
 

@@ -1,7 +1,6 @@
 package hyperv
 
 import (
-	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -39,13 +38,17 @@ disks:
 	}
 
 	// makeHook returns a hook for the batch queries used by GetResourceList.
-	// vmState is returned for "test-vm"; switchType (empty string → missing) for "test-switch".
+	// vmState is returned for "test-vm"; switchType (empty string → switch absent from
+	// host but PS succeeds; no entry in the batch table) for "test-switch".
 	makeHook := func(vmState string, switchType string, diskPresent bool) func(string) ([]byte, error) {
 		return func(cmd string) ([]byte, error) {
 			// Check Get-VMSwitch before Get-VM because the latter is a substring of the former.
 			if strings.Contains(cmd, "Get-VMSwitch") {
 				if switchType == "" {
-					return nil, errors.New("not found")
+					// Switch is not on the host; return an empty table (PS call succeeds
+					// but no rows). getSwitchTypeMap will return an empty map without an
+					// error, and GetResourceList will report the switch as "missing".
+					return []byte("Name  SwitchType\n----  ----------\n"), nil
 				}
 				return []byte("Name        SwitchType\n----        ----------\ntest-switch " + switchType + "\n"), nil
 			}

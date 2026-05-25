@@ -119,33 +119,6 @@ func TestCheckHyperVPermission(t *testing.T) {
 	})
 }
 
-// --- checkCmdletExists ---
-
-func TestCheckCmdletExists(t *testing.T) {
-	t.Run("cmdlet found returns OK", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte(""), nil
-		})
-		r := checkCmdletExists("Get-VM")
-		if r.Status != CheckOK {
-			t.Errorf("checkCmdletExists: expected CheckOK, got %v", r.Status)
-		}
-		if r.Name != "Get-VM" {
-			t.Errorf("checkCmdletExists: expected Name=Get-VM, got %q", r.Name)
-		}
-	})
-
-	t.Run("cmdlet not found returns Fail", func(t *testing.T) {
-		withPS(t, nil, func(_ string) ([]byte, error) {
-			return nil, errors.New("not found")
-		})
-		r := checkCmdletExists("Get-VM")
-		if r.Status != CheckFail {
-			t.Errorf("checkCmdletExists: expected CheckFail, got %v", r.Status)
-		}
-	})
-}
-
 // --- CheckSystem ---
 
 func TestCheckSystem(t *testing.T) {

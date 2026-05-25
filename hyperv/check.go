@@ -126,11 +126,3 @@ func checkCmdlets(cmdlets []string) []CheckResult {
 	}
 	return results
 }
-
-func checkCmdletExists(cmdlet string) CheckResult {
-	_, err := outputPS("Get-Command " + ps(cmdlet) + " -ErrorAction Stop | Out-Null")
-	if err != nil {
-		return CheckResult{Name: cmdlet, Status: CheckFail, Message: "not found"}
-	}
-	return CheckResult{Name: cmdlet, Status: CheckOK, Message: "available"}
-}

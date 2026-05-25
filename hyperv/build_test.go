@@ -263,14 +263,21 @@ func TestResolveAndCreateDisks(t *testing.T) {
 		},
 	}
 
-	t.Run("count=1 returns base path without creating a new disk", func(t *testing.T) {
+	t.Run("count=1 disk already exists returns base path without creating", func(t *testing.T) {
+		// When the disk file is already present, resolveAndCreateDisks must not
+		// call CreateDisk (runPS) even though it now performs an idempotent check.
 		runCalled := false
 		withPS(t,
 			func(_ string) error {
 				runCalled = true
 				return nil
 			},
-			buildOutputMock,
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("True\n"), nil // disk already exists
+				}
+				return buildOutputMock(cmd)
+			},
 		)
 		paths, err := resolveAndCreateDisks(config, []string{"boot"}, 1, 1)
 		if err != nil {
@@ -280,7 +287,35 @@ func TestResolveAndCreateDisks(t *testing.T) {
 			t.Errorf("resolveAndCreateDisks count=1: got %v, want [C:\\VMs\\boot.vhd]", paths)
 		}
 		if runCalled {
-			t.Error("resolveAndCreateDisks count=1: runPS should not be called")
+			t.Error("resolveAndCreateDisks count=1: runPS should not be called when disk already exists")
+		}
+	})
+
+	t.Run("count=1 disk not found creates it idempotently", func(t *testing.T) {
+		// A disk alias that was skipped in the top-level pass (because another VM
+		// with count>1 also references it) must be created here for the count=1 VM.
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("False\n"), nil // disk not yet on disk
+				}
+				return buildOutputMock(cmd)
+			},
+		)
+		paths, err := resolveAndCreateDisks(config, []string{"boot"}, 1, 1)
+		if err != nil {
+			t.Fatalf("resolveAndCreateDisks count=1 create: expected nil, got %v", err)
+		}
+		if len(paths) != 1 || paths[0] != `C:\VMs\boot.vhd` {
+			t.Errorf("resolveAndCreateDisks count=1 create: got %v, want [C:\\VMs\\boot.vhd]", paths)
+		}
+		if !runCalled {
+			t.Error("resolveAndCreateDisks count=1 create: runPS should be called to create missing disk")
 		}
 	})
 
@@ -626,18 +661,34 @@ func TestStartByStruct(t *testing.T) {
 		}
 	})
 
-	t.Run("not found VM is skipped", func(t *testing.T) {
+	t.Run("VM absent from host is skipped silently", func(t *testing.T) {
+		// A VM in the config that does not appear in the batch PS output (absent
+		// map key) is treated as NotFound and silently skipped.
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+			func(_ string) ([]byte, error) {
+				// Empty batch: host has no VMs.
+				return batchVMStateOutput(map[string]string{}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"ghost": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
 			t.Fatalf("StartByStruct: expected nil for not-found VM, got %v", err)
 		}
 		if runCalled {
-			t.Error("StartByStruct: runPS called for not-found VM")
+			t.Error("StartByStruct: runPS called for absent VM")
+		}
+	})
+
+	t.Run("getVMStateMap PS failure propagates as error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("hyper-v unavailable") },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err == nil {
+			t.Fatal("StartByStruct: expected error on PS failure, got nil")
 		}
 	})
 

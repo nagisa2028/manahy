@@ -44,10 +44,11 @@ func GetVMState(name string) string {
 // getVMStateMap returns name→state for all VMs on the host in one PS call.
 // VMs in transient states (e.g. Starting, Stopping) are included with their raw state string.
 // Missing entries should be treated as NotFound by callers.
-func getVMStateMap() map[string]string {
+// Returns an error if the PowerShell query fails.
+func getVMStateMap() (map[string]string, error) {
 	res, err := outputPS(cmdGetVM + " | Format-Table Name, State")
 	if err != nil {
-		return map[string]string{}
+		return nil, fmt.Errorf("failed to query VM states: %w", err)
 	}
 	m := make(map[string]string)
 	for _, line := range reSplit.Split(string(res), -1) {
@@ -77,7 +78,7 @@ func getVMStateMap() map[string]string {
 			m[name] = state
 		}
 	}
-	return m
+	return m, nil
 }
 
 // IsVMExist returns an error if the VM does not exist.
@@ -187,7 +188,10 @@ func SetVMSwitch(name string, networks []string) error {
 	// Validate all switches in one batch PS call rather than one call per switch.
 	// A missing map entry means the switch does not exist or the batch PS call
 	// failed; either way the operation cannot proceed.
-	typeMap := getSwitchTypeMap()
+	typeMap, err := getSwitchTypeMap()
+	if err != nil {
+		return err
+	}
 	for _, network := range networks {
 		if typeMap[network] == "" {
 			return fmt.Errorf("switch %s does not exist", network)
@@ -288,8 +292,8 @@ func RenameVM(name string, newName string) error {
 
 // ConnectVM opens a VM console connection.
 func ConnectVM(name string) error {
-	if GetVMState(name) != vmStateRunning {
-		return fmt.Errorf("VM %s is not running", name)
+	if err := IsVMExist(name); err != nil {
+		return err
 	}
 	return runPS(cmdVMConnect + " localhost " + ps(name))
 }
@@ -440,12 +444,17 @@ func checkMemorySize(size string) error {
 	}
 	n, _ := strconv.Atoi(size[:len(size)-2])
 	unit := size[len(size)-2:]
-	sizeGB := n
-	if unit == "TB" {
-		sizeGB = n * 1024
+	var sizeMB int
+	switch unit {
+	case "TB":
+		sizeMB = n * 1024 * 1024
+	case "GB":
+		sizeMB = n * 1024
+	default: // MB
+		sizeMB = n
 	}
-	if sizeGB > maxMemorySizeGB {
-		return fmt.Errorf("memory size %s exceeds maximum allowed size of %dTB", size, maxMemorySizeGB/1024)
+	if sizeMB > maxMemorySizeGB*1024 {
+		return fmt.Errorf("memory size %s exceeds maximum allowed size of 16TB", size)
 	}
 	return nil
 }

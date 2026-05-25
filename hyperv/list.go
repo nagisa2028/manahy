@@ -35,13 +35,19 @@ func GetResourceList(configFile string) (ResourceList, error) {
 
 	go func() {
 		defer wg.Done()
-		stateMap := getVMStateMap()
+		stateMap, err := getVMStateMap()
 		vms := make([]ResourceStatus, 0, len(cfg.Vms))
 		for name, vm := range cfg.Vms {
 			for _, instanceName := range vmInstanceNames(name, vm) {
-				state, ok := stateMap[instanceName]
-				if !ok {
-					state = vmStateNotFound
+				var state string
+				if err != nil {
+					state = "error"
+				} else {
+					var ok bool
+					state, ok = stateMap[instanceName]
+					if !ok {
+						state = vmStateNotFound
+					}
 				}
 				vms = append(vms, ResourceStatus{Name: instanceName, Status: state})
 			}
@@ -75,12 +81,18 @@ func GetResourceList(configFile string) (ResourceList, error) {
 
 	go func() {
 		defer wg.Done()
-		switchMap := getSwitchTypeMap()
+		switchMap, err := getSwitchTypeMap()
 		networks := make([]ResourceStatus, 0, len(cfg.Networks))
 		for name := range cfg.Networks {
-			switchType, ok := switchMap[name]
-			if !ok {
-				switchType = "missing"
+			var switchType string
+			if err != nil {
+				switchType = "error"
+			} else {
+				var ok bool
+				switchType, ok = switchMap[name]
+				if !ok {
+					switchType = "missing"
+				}
 			}
 			networks = append(networks, ResourceStatus{Name: name, Status: switchType})
 		}
