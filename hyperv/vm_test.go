@@ -315,7 +315,8 @@ func TestSetVMSwitch(t *testing.T) {
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
 			func(_ string) ([]byte, error) {
-				return []byte("SwitchType\n----------\nInternal\n"), nil
+				// getSwitchTypeMap expects batch Format-Table Name, SwitchType output.
+				return []byte("Name     SwitchType\n----     ----------\nmySwitch Internal\n"), nil
 			},
 		)
 		if err := SetVMSwitch("my-vm", []string{"mySwitch"}); err != nil {
@@ -355,16 +356,20 @@ func TestSetVMSwitch(t *testing.T) {
 		}
 	})
 
-	t.Run("switch unknown state returns error", func(t *testing.T) {
+	t.Run("switch not in batch output returns error", func(t *testing.T) {
+		// getSwitchTypeMap returns an empty map when the switch is absent from the output.
+		// The batch approach cannot distinguish "not found" from "unknown type"; both
+		// produce an empty map entry and result in a "does not exist" error.
 		withPS(t, nil, func(_ string) ([]byte, error) {
-			return []byte("SwitchType\n----------\n"), nil // Unknown
+			// Output lists a different switch; ambiguous-switch is absent → empty map entry.
+			return []byte("Name      SwitchType\n----      ----------\nother-sw  Internal\n"), nil
 		})
 		err := SetVMSwitch("my-vm", []string{"ambiguous-switch"})
 		if err == nil {
-			t.Fatal("SetVMSwitch: expected error for Unknown switch state, got nil")
+			t.Fatal("SetVMSwitch: expected error for absent switch, got nil")
 		}
-		if !strings.Contains(err.Error(), "failed to get") {
-			t.Errorf("SetVMSwitch: error %q does not contain 'failed to get'", err.Error())
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("SetVMSwitch: error %q does not contain 'does not exist'", err.Error())
 		}
 	})
 }

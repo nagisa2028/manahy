@@ -118,11 +118,7 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 		if state == vmStateRunning || state == "" {
 			return
 		}
-		if !reVMState.MatchString(state) {
-			// VM is present but in a transient state (Starting, Stopping, etc.).
-			mu.Lock()
-			_, _ = fmt.Fprintf(w, "skipping %s: VM is in transient state %q\n", name, state)
-			mu.Unlock()
+		if skipIfTransient(state, name, w, &mu) {
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
@@ -135,16 +131,35 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 	return lastErr
 }
 
+// skipIfTransient writes a warning to w and returns true when the VM is present
+// in the state map but in a transient state that prevents the requested
+// operation (e.g. "Starting" when trying to stop). It returns false for stable
+// states (Running/Saved/Off/Paused) and for VMs absent from the map.
+func skipIfTransient(state, name string, w io.Writer, mu *sync.Mutex) bool {
+	if state == "" || reVMState.MatchString(state) {
+		return false
+	}
+	mu.Lock()
+	_, _ = fmt.Fprintf(w, "skipping %s: VM is in transient state %q\n", name, state)
+	mu.Unlock()
+	return true
+}
+
 // StopByStruct gracefully stops all VMs defined in the config concurrently.
 // VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StopByStruct(summarize Summarize, w io.Writer) error {
 	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if stateMap[name] != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
@@ -160,13 +175,18 @@ func StopByStruct(summarize Summarize, w io.Writer) error {
 // RestartByStruct restarts all running VMs defined in the config concurrently.
 // VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func RestartByStruct(summarize Summarize, w io.Writer) error {
 	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if stateMap[name] != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
@@ -182,13 +202,18 @@ func RestartByStruct(summarize Summarize, w io.Writer) error {
 // SaveByStruct saves the state of all running VMs defined in the config concurrently.
 // VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func SaveByStruct(summarize Summarize, w io.Writer) error {
 	stateMap := getVMStateMap()
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if stateMap[name] != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {

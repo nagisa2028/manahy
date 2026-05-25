@@ -64,7 +64,10 @@ func loadConfig(path string) hyperv.Summarize {
 }
 
 // runParallel runs fn for every name concurrently.
-// Each failure is printed to stderr immediately; the last error is returned.
+// Each failure is printed to stderr immediately so the user sees partial
+// results without waiting for the full batch to complete.
+// Only the last error encountered is returned; callers that need to
+// distinguish individual failures should inspect the stderr output.
 func runParallel(names []string, fn func(string) error) error {
 	var (
 		wg      sync.WaitGroup

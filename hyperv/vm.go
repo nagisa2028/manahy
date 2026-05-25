@@ -184,12 +184,13 @@ func SetVMSwitch(name string, networks []string) error {
 	if len(networks) == 0 {
 		return nil
 	}
+	// Validate all switches in one batch PS call rather than one call per switch.
+	// A missing map entry means the switch does not exist or the batch PS call
+	// failed; either way the operation cannot proceed.
+	typeMap := getSwitchTypeMap()
 	for _, network := range networks {
-		switch GetSwitchType(network) {
-		case vmStateNotFound:
+		if typeMap[network] == "" {
 			return fmt.Errorf("switch %s does not exist", network)
-		case vmStateUnknown:
-			return fmt.Errorf("failed to get state of switch %s", network)
 		}
 	}
 	var sb strings.Builder
