@@ -65,8 +65,12 @@ func getVMStateMap() map[string]string {
 			continue
 		}
 		// Reconstruct the VM name as everything before the last whitespace token.
-		// strings.LastIndex handles multi-word names and names that contain the state
-		// string as a substring (Format-Table always pads name and state columns).
+		// strings.LastIndex is safe here because Format-Table always right-pads the
+		// Name column with spaces before the State column, ensuring the state word
+		// appears at the rightmost position in the line. Even when the VM name
+		// contains the same word as the state (e.g. "vm-Off-test" with state "Off"),
+		// LastIndex returns the index of the actual state column — not the substring
+		// inside the name — because the state column occurrence is always last.
 		idx := strings.LastIndex(line, state)
 		name := strings.TrimSpace(line[:idx])
 		if name != "" {
@@ -128,6 +132,11 @@ func SetVMMemory(name string, memory Memory) error {
 }
 
 // SetVMHardDisk attaches hard disk drives to a VM.
+// All Add-VMHardDiskDrive calls are batched into a single PowerShell script
+// separated by semicolons. $ErrorActionPreference = 'Stop' is prepended so
+// that the first failure aborts the script immediately rather than continuing
+// to attach subsequent disks. VM names and paths are escaped via ps() which
+// wraps values in single quotes and doubles any embedded single quote.
 func SetVMHardDisk(name string, disks []string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
@@ -167,6 +176,10 @@ func SetVMImageFile(name string, image string) error {
 }
 
 // SetVMSwitch connects network adapters of a VM to virtual switches.
+// All Add-VMNetworkAdapter calls are batched into a single PowerShell script.
+// $ErrorActionPreference = 'Stop' causes the script to abort on the first
+// failure, so network adapters beyond the failing one are not attached.
+// Names are escaped via ps() (single-quoted with embedded quotes doubled).
 func SetVMSwitch(name string, networks []string) error {
 	if len(networks) == 0 {
 		return nil

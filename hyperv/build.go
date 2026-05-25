@@ -112,6 +112,9 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
 		state := stateMap[name]
+		// state == "" means the VM was not found in the batch PS output (absent map
+		// key). This is equivalent to vmStateNotFound and should be silently skipped,
+		// just as a VM that does not exist on the host would be.
 		if state == vmStateRunning || state == "" {
 			return
 		}

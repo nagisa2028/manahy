@@ -958,6 +958,62 @@ func TestGetVMList(t *testing.T) {
 	})
 }
 
+// ---------- getVMStateMap ----------
+
+func TestGetVMStateMap(t *testing.T) {
+	t.Run("VM name containing state word is parsed correctly", func(t *testing.T) {
+		// strings.LastIndex must find the state-column occurrence, not the one
+		// embedded in the VM name. Format-Table pads between columns, so the
+		// state word always appears last in the line.
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\n" +
+				"vm-Off-test  Off\n" +
+				"RunningServer  Running\n" +
+				"my-Saved-backup  Saved\n"), nil
+		})
+		m := getVMStateMap()
+		if m["vm-Off-test"] != "Off" {
+			t.Errorf("vm-Off-test: got %q, want %q", m["vm-Off-test"], "Off")
+		}
+		if m["RunningServer"] != "Running" {
+			t.Errorf("RunningServer: got %q, want %q", m["RunningServer"], "Running")
+		}
+		if m["my-Saved-backup"] != "Saved" {
+			t.Errorf("my-Saved-backup: got %q, want %q", m["my-Saved-backup"], "Saved")
+		}
+	})
+
+	t.Run("transient-state VM is included in map", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\nstartup-vm  Starting\n"), nil
+		})
+		m := getVMStateMap()
+		if m["startup-vm"] != "Starting" {
+			t.Errorf("startup-vm: got %q, want %q", m["startup-vm"], "Starting")
+		}
+	})
+
+	t.Run("multi-word VM name is parsed correctly", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\nName Server  Running\n"), nil
+		})
+		m := getVMStateMap()
+		if m["Name Server"] != "Running" {
+			t.Errorf("Name Server: got %q, want %q", m["Name Server"], "Running")
+		}
+	})
+
+	t.Run("PS error returns empty map", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("ps unavailable")
+		})
+		m := getVMStateMap()
+		if len(m) != 0 {
+			t.Errorf("expected empty map on PS error, got %v", m)
+		}
+	})
+}
+
 // ---------- ConnectVM ----------
 
 func TestConnectVM(t *testing.T) {

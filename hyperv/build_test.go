@@ -566,8 +566,16 @@ func TestRemoveByStruct(t *testing.T) {
 
 // --- StartByStruct / StopByStruct ---
 
-// batchVMStateOutput returns a Format-Table Name,State output for the given
-// name→state mapping, matching the format produced by getVMStateMap's PS query.
+// batchVMStateOutput returns a simulated Format-Table Name,State output for
+// the given name→state mapping. The format intentionally mirrors what
+// PowerShell's "Get-VM | Format-Table Name, State" produces:
+//
+//	Name    State
+//	----    -----
+//	vm1     Running
+//
+// The helper uses two spaces between name and state (real PS output pads to
+// column width, but the parser only requires at least one whitespace separator).
 // Keys are sorted so the output is deterministic across test runs.
 func batchVMStateOutput(nameStates map[string]string) []byte {
 	names := make([]string, 0, len(nameStates))
