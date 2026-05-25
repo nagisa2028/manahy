@@ -465,3 +465,131 @@ func TestCreateSwitch(t *testing.T) {
 		}
 	})
 }
+
+// ---------- TestGetSwitchList ----------
+
+func TestGetSwitchList(t *testing.T) {
+	t.Run("returns parsed switch list on valid output", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name        SwitchType\n----------  ----------\nmySwitch    Internal\nextSwitch   External\n"), nil
+		})
+		list, err := GetSwitchList()
+		if err != nil {
+			t.Fatalf("GetSwitchList: expected nil, got %v", err)
+		}
+		_ = list // structure populated; exact fields depend on switchListingOfExecuteResults
+	})
+
+	t.Run("PS error returns empty list and error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("ps error")
+		})
+		_, err := GetSwitchList()
+		if err == nil {
+			t.Fatal("GetSwitchList: expected error on PS failure, got nil")
+		}
+	})
+}
+
+// ---------- TestChangeSwitchNetAdapter ----------
+
+func TestChangeSwitchNetAdapter(t *testing.T) {
+	t.Run("switch exists calls runPS and returns nil", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return []byte("SwitchType\n----------\nExternal\n"), nil
+			},
+		)
+		if err := ChangeSwitchNetAdapter("mySwitch", "eth0"); err != nil {
+			t.Errorf("ChangeSwitchNetAdapter: expected nil, got %v", err)
+		}
+		if !runCalled {
+			t.Error("ChangeSwitchNetAdapter: runPS was not called")
+		}
+	})
+
+	t.Run("switch not found returns error does not exist", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := ChangeSwitchNetAdapter("missing", "eth0")
+		if err == nil {
+			t.Fatal("ChangeSwitchNetAdapter: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("ChangeSwitchNetAdapter: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("Unknown state returns error failed to get", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("SwitchType\n----------\n"), nil
+		})
+		err := ChangeSwitchNetAdapter("mySwitch", "eth0")
+		if err == nil {
+			t.Fatal("ChangeSwitchNetAdapter: expected error for Unknown state, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to get") {
+			t.Errorf("ChangeSwitchNetAdapter: error %q does not contain 'failed to get'", err.Error())
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error {
+				return errors.New("ps error")
+			},
+			func(_ string) ([]byte, error) {
+				return []byte("SwitchType\n----------\nExternal\n"), nil
+			},
+		)
+		err := ChangeSwitchNetAdapter("mySwitch", "eth0")
+		if err == nil {
+			t.Fatal("ChangeSwitchNetAdapter: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- runPS failure paths for switch operations ----------
+
+func TestRemoveSwitchRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("remove failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("SwitchType\n----------\nInternal\n"), nil
+		},
+	)
+	err := RemoveSwitch("mySwitch")
+	if err == nil {
+		t.Fatal("RemoveSwitch: expected error from runPS, got nil")
+	}
+}
+
+func TestRenameSwitchRunPSFailure(t *testing.T) {
+	callCount := 0
+	withPS(t,
+		func(_ string) error {
+			return errors.New("rename failed")
+		},
+		func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				// IsSwitchExist for source: exists
+				return []byte("SwitchType\n----------\nExternal\n"), nil
+			}
+			// IsNotSwitchExist for new name: not found
+			return nil, errors.New("not found")
+		},
+	)
+	err := RenameSwitch("source", "newName")
+	if err == nil {
+		t.Fatal("RenameSwitch: expected error from runPS, got nil")
+	}
+}

@@ -572,3 +572,102 @@ func TestSetVMDvdDrive(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// runPS failure paths
+// =============================================================================
+
+func TestAddVMNetworkAdapterRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := AddVMNetworkAdapter("my-vm", "", "")
+	if err == nil {
+		t.Fatal("AddVMNetworkAdapter: expected error from runPS, got nil")
+	}
+}
+
+func TestRemoveVMNetworkAdapterRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := RemoveVMNetworkAdapter("my-vm", "eth0")
+	if err == nil {
+		t.Fatal("RemoveVMNetworkAdapter: expected error from runPS, got nil")
+	}
+}
+
+func TestConnectVMNetworkAdapterRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := ConnectVMNetworkAdapter("my-vm", "eth0", "mySwitch")
+	if err == nil {
+		t.Fatal("ConnectVMNetworkAdapter: expected error from runPS, got nil")
+	}
+}
+
+func TestAddVMHardDiskDriveRunPSFailure(t *testing.T) {
+	callCount := 0
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return vmRunningOutput(), nil
+			}
+			return []byte("True\n"), nil
+		},
+	)
+	err := AddVMHardDiskDrive("my-vm", `C:\disk.vhd`)
+	if err == nil {
+		t.Fatal("AddVMHardDiskDrive: expected error from runPS, got nil")
+	}
+}
+
+func TestRemoveVMHardDiskDriveRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := RemoveVMHardDiskDrive("my-vm", `C:\disk.vhd`)
+	if err == nil {
+		t.Fatal("RemoveVMHardDiskDrive: expected error from runPS, got nil")
+	}
+}
+
+func TestAddVMDvdDriveRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := AddVMDvdDrive("my-vm")
+	if err == nil {
+		t.Fatal("AddVMDvdDrive: expected error from runPS, got nil")
+	}
+}
+
+func TestRemoveVMDvdDriveRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := RemoveVMDvdDrive("my-vm")
+	if err == nil {
+		t.Fatal("RemoveVMDvdDrive: expected error from runPS, got nil")
+	}
+}
+
+func TestSetVMDvdDriveRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("runPS failed") },
+		func(_ string) ([]byte, error) { return vmRunningOutput(), nil },
+	)
+	err := SetVMDvdDrive("my-vm", "")
+	if err == nil {
+		t.Fatal("SetVMDvdDrive: expected error from runPS, got nil")
+	}
+}

@@ -892,3 +892,373 @@ func TestRenameVM(t *testing.T) {
 		}
 	})
 }
+
+// ---------- GetVMList ----------
+
+func TestGetVMList(t *testing.T) {
+	t.Run("parses running and off VMs", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\nalpha   Running\nbeta    Off\n"), nil
+		})
+		list, err := GetVMList()
+		if err != nil {
+			t.Fatalf("GetVMList: unexpected error: %v", err)
+		}
+		if len(list.Running) != 1 || list.Running[0] != "alpha" {
+			t.Errorf("GetVMList: Running = %v, want [alpha]", list.Running)
+		}
+		if len(list.Off) != 1 || list.Off[0] != "beta" {
+			t.Errorf("GetVMList: Off = %v, want [beta]", list.Off)
+		}
+	})
+
+	t.Run("parses all four states", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\nvm1     Running\nvm2     Saved\nvm3     Paused\nvm4     Off\n"), nil
+		})
+		list, err := GetVMList()
+		if err != nil {
+			t.Fatalf("GetVMList: unexpected error: %v", err)
+		}
+		if len(list.Running) != 1 {
+			t.Errorf("GetVMList: Running count = %d, want 1", len(list.Running))
+		}
+		if len(list.Saved) != 1 {
+			t.Errorf("GetVMList: Saved count = %d, want 1", len(list.Saved))
+		}
+		if len(list.Paused) != 1 {
+			t.Errorf("GetVMList: Paused count = %d, want 1", len(list.Paused))
+		}
+		if len(list.Off) != 1 {
+			t.Errorf("GetVMList: Off count = %d, want 1", len(list.Off))
+		}
+	})
+
+	t.Run("empty host returns empty lists", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("Name    State\n----    -----\n"), nil
+		})
+		list, err := GetVMList()
+		if err != nil {
+			t.Fatalf("GetVMList: unexpected error: %v", err)
+		}
+		if len(list.Running)+len(list.Off)+len(list.Saved)+len(list.Paused) != 0 {
+			t.Errorf("GetVMList: expected all empty, got %+v", list)
+		}
+	})
+
+	t.Run("PS error returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("hyper-v not available")
+		})
+		_, err := GetVMList()
+		if err == nil {
+			t.Fatal("GetVMList: expected error, got nil")
+		}
+	})
+}
+
+// ---------- ConnectVM ----------
+
+func TestConnectVM(t *testing.T) {
+	t.Run("running VM calls runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		if err := ConnectVM("my-vm"); err != nil {
+			t.Fatalf("ConnectVM: unexpected error: %v", err)
+		}
+		if !runCalled {
+			t.Error("ConnectVM: expected runPS to be called")
+		}
+	})
+
+	t.Run("non-running VM returns error without runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		err := ConnectVM("my-vm")
+		if err == nil {
+			t.Fatal("ConnectVM: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "not running") {
+			t.Errorf("ConnectVM: error %q does not contain 'not running'", err.Error())
+		}
+		if runCalled {
+			t.Error("ConnectVM: runPS should not be called when VM is not running")
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("vmconnect not found") },
+			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+		)
+		if err := ConnectVM("my-vm"); err == nil {
+			t.Fatal("ConnectVM: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- ExportVM ----------
+
+func TestExportVM(t *testing.T) {
+	t.Run("VM exists calls runPSLong", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := ExportVM("my-vm", `C:\Exports`); err != nil {
+			t.Fatalf("ExportVM: unexpected error: %v", err)
+		}
+		if !runCalled {
+			t.Error("ExportVM: expected runPS to be called")
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := ExportVM("ghost", `C:\Exports`)
+		if err == nil {
+			t.Fatal("ExportVM: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("ExportVM: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("export failed") },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := ExportVM("my-vm", `C:\Exports`); err == nil {
+			t.Fatal("ExportVM: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- ImportVM ----------
+
+func TestImportVM(t *testing.T) {
+	t.Run("calls runPSLong with path", func(t *testing.T) {
+		var capturedCmd string
+		withPS(t,
+			func(c string) error { capturedCmd = c; return nil },
+			nil,
+		)
+		if err := ImportVM(`C:\VMs\vm.vmcx`); err != nil {
+			t.Fatalf("ImportVM: unexpected error: %v", err)
+		}
+		if !strings.Contains(capturedCmd, `C:\VMs\vm.vmcx`) {
+			t.Errorf("ImportVM: command %q does not contain path", capturedCmd)
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("import failed") },
+			nil,
+		)
+		if err := ImportVM(`C:\VMs\vm.vmcx`); err == nil {
+			t.Fatal("ImportVM: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- MoveVMStorage ----------
+
+func TestMoveVMStorage(t *testing.T) {
+	t.Run("VM exists calls runPSLong", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := MoveVMStorage("my-vm", `D:\VMs`); err != nil {
+			t.Fatalf("MoveVMStorage: unexpected error: %v", err)
+		}
+		if !runCalled {
+			t.Error("MoveVMStorage: expected runPS to be called")
+		}
+	})
+
+	t.Run("VM not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		err := MoveVMStorage("ghost", `D:\VMs`)
+		if err == nil {
+			t.Fatal("MoveVMStorage: expected error, got nil")
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return errors.New("move failed") },
+			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+		)
+		if err := MoveVMStorage("my-vm", `D:\VMs`); err == nil {
+			t.Fatal("MoveVMStorage: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- CopyVM ----------
+
+func TestCopyVM(t *testing.T) {
+	t.Run("source exists new name free calls runPSLong", func(t *testing.T) {
+		callCount := 0
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				callCount++
+				if callCount == 1 {
+					return stateOutput("Off"), nil // IsVMExist source
+				}
+				return nil, errors.New("not found") // IsNotVMExist dest
+			},
+		)
+		if err := CopyVM("src", "dst", `C:\Exports`); err != nil {
+			t.Fatalf("CopyVM: unexpected error: %v", err)
+		}
+		if !runCalled {
+			t.Error("CopyVM: expected runPS to be called")
+		}
+	})
+
+	t.Run("source not found returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return nil, errors.New("not found")
+		})
+		if err := CopyVM("ghost", "dst", `C:\Exports`); err == nil {
+			t.Fatal("CopyVM: expected error, got nil")
+		}
+	})
+
+	t.Run("destination already exists returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return stateOutput("Off"), nil // source exists
+			}
+			return stateOutput("Running"), nil // dest already exists
+		})
+		err := CopyVM("src", "existing-dst", `C:\Exports`)
+		if err == nil {
+			t.Fatal("CopyVM: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("CopyVM: error %q does not contain 'already exists'", err.Error())
+		}
+	})
+
+	t.Run("VM name with path separator returns error", func(t *testing.T) {
+		callCount := 0
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			callCount++
+			if callCount == 1 {
+				return stateOutput("Off"), nil
+			}
+			return nil, errors.New("not found")
+		})
+		err := CopyVM(`src\bad`, "dst", `C:\Exports`)
+		if err == nil {
+			t.Fatal("CopyVM: expected error for name with path separator, got nil")
+		}
+		if !strings.Contains(err.Error(), "path separators") {
+			t.Errorf("CopyVM: error %q does not contain 'path separators'", err.Error())
+		}
+	})
+}
+
+// ---------- runPS failure paths for lifecycle operations ----------
+
+func TestStartVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+	)
+	if err := StartVM("my-vm"); err == nil {
+		t.Fatal("StartVM: expected error from runPS, got nil")
+	}
+}
+
+func TestStopVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := StopVM("my-vm"); err == nil {
+		t.Fatal("StopVM: expected error from runPS, got nil")
+	}
+}
+
+func TestDestroyVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := DestroyVM("my-vm"); err == nil {
+		t.Fatal("DestroyVM: expected error from runPS, got nil")
+	}
+}
+
+func TestSaveVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := SaveVM("my-vm"); err == nil {
+		t.Fatal("SaveVM: expected error from runPS, got nil")
+	}
+}
+
+func TestSuspendVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := SuspendVM("my-vm"); err == nil {
+		t.Fatal("SuspendVM: expected error from runPS, got nil")
+	}
+}
+
+func TestRestartVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := RestartVM("my-vm"); err == nil {
+		t.Fatal("RestartVM: expected error from runPS, got nil")
+	}
+}
+
+func TestResumeVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Paused"), nil },
+	)
+	if err := ResumeVM("my-vm"); err == nil {
+		t.Fatal("ResumeVM: expected error from runPS, got nil")
+	}
+}
+
+func TestRemoveVMRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error { return errors.New("access denied") },
+		func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+	)
+	if err := RemoveVM("my-vm", false); err == nil {
+		t.Fatal("RemoveVM: expected error from runPS, got nil")
+	}
+}
