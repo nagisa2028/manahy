@@ -21,7 +21,8 @@ type ResourceList struct {
 }
 
 // GetResourceList returns the live status of all resources defined in the config file.
-// VM, disk, and network queries are issued concurrently.
+// VM, disk, and network queries are issued concurrently; VM and network states are
+// fetched in single batch PS calls rather than one call per resource.
 func GetResourceList(configFile string) (ResourceList, error) {
 	cfg, err := UnmarshalYaml(configFile)
 	if err != nil {
@@ -34,44 +35,68 @@ func GetResourceList(configFile string) (ResourceList, error) {
 
 	go func() {
 		defer wg.Done()
+		stateMap, err := getVMStateMap()
+		vms := make([]ResourceStatus, 0, len(cfg.Vms))
 		for name, vm := range cfg.Vms {
 			for _, instanceName := range vmInstanceNames(name, vm) {
-				rl.VMs = append(rl.VMs, ResourceStatus{Name: instanceName, Status: GetVMState(instanceName)})
+				var state string
+				if err != nil {
+					state = "error"
+				} else {
+					var ok bool
+					state, ok = stateMap[instanceName]
+					if !ok {
+						state = vmStateNotFound
+					}
+				}
+				vms = append(vms, ResourceStatus{Name: instanceName, Status: state})
 			}
 		}
+		rl.VMs = vms
 	}()
 
 	go func() {
 		defer wg.Done()
 		multiRefs := multiCountDiskRefs(cfg)
+		disks := make([]ResourceStatus, 0, len(cfg.Disks))
 		for name, d := range cfg.Disks {
 			if multiRefs[name] {
 				count := maxCountForDiskRef(cfg, name)
 				for i := 1; i <= count; i++ {
 					path := numberPath(d.Path, i)
-					rl.Disks = append(rl.Disks, ResourceStatus{
+					disks = append(disks, ResourceStatus{
 						Name:   name + strconv.Itoa(i),
 						Status: fmt.Sprintf("%s (%s)", diskFileStatus(path), path),
 					})
 				}
 			} else {
-				rl.Disks = append(rl.Disks, ResourceStatus{
+				disks = append(disks, ResourceStatus{
 					Name:   name,
 					Status: fmt.Sprintf("%s (%s)", diskFileStatus(d.Path), d.Path),
 				})
 			}
 		}
+		rl.Disks = disks
 	}()
 
 	go func() {
 		defer wg.Done()
+		switchMap, err := getSwitchTypeMap()
+		networks := make([]ResourceStatus, 0, len(cfg.Networks))
 		for name := range cfg.Networks {
-			switchStatus := GetSwitchType(name)
-			if switchStatus == vmStateNotFound {
-				switchStatus = "missing"
+			var switchType string
+			if err != nil {
+				switchType = "error"
+			} else {
+				var ok bool
+				switchType, ok = switchMap[name]
+				if !ok {
+					switchType = "missing"
+				}
 			}
-			rl.Networks = append(rl.Networks, ResourceStatus{Name: name, Status: switchStatus})
+			networks = append(networks, ResourceStatus{Name: name, Status: switchType})
 		}
+		rl.Networks = networks
 	}()
 
 	wg.Wait()

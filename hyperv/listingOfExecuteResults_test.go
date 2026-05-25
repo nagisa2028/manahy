@@ -149,12 +149,32 @@ func TestVmListingOfExecuteResults(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown state returns error", func(t *testing.T) {
-		// A line that has no recognised state suffix triggers the default branch.
-		input := "Name                   State\n----                   -----\nmy-vm                  Crashed\n"
-		_, err := vmListingOfExecuteResults([]byte(input))
-		if err == nil {
-			t.Fatal("expected error for unknown state, got nil")
+	t.Run("unknown/transient state is skipped not errored", func(t *testing.T) {
+		// VMs in transient states (Starting, Stopping, Saving, or any unrecognised
+		// state) are silently skipped so that GetVMList does not fail while VMs are
+		// transitioning.
+		input := "Name                   State\n----                   -----\nmy-vm                  Crashed\ngood-vm                Running\n"
+		list, err := vmListingOfExecuteResults([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error for unknown state: %v", err)
+		}
+		// "my-vm" with unknown state is skipped; "good-vm" is returned.
+		if len(list.Running) != 1 || list.Running[0] != "good-vm" {
+			t.Errorf("expected [good-vm] in Running, got %v", list.Running)
+		}
+	})
+
+	t.Run("multi-word VM name is parsed correctly", func(t *testing.T) {
+		// Previously, a VM named "Name Server" was falsely treated as a header row
+		// because the first token was "Name". After removing isTableHeader, the
+		// default:continue handles the real header, so multi-word names work.
+		input := "Name                   State\n----                   -----\nName Server            Running\n"
+		list, err := vmListingOfExecuteResults([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(list.Running) != 1 || list.Running[0] != "Name Server" {
+			t.Errorf("expected [Name Server] in Running, got %v", list.Running)
 		}
 	})
 
@@ -205,11 +225,17 @@ func TestSwitchListingOfExecuteResults(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown type returns error", func(t *testing.T) {
-		input := "Name            SwitchType\n----            ----------\nmy-switch       Bridged\n"
-		_, err := switchListingOfExecuteResults([]byte(input))
-		if err == nil {
-			t.Fatal("expected error for unknown switch type, got nil")
+	t.Run("unknown switch type is skipped not errored", func(t *testing.T) {
+		// An unrecognised switch type is silently skipped so that GetSwitchList
+		// does not fail if Hyper-V adds new types in future Windows versions.
+		input := "Name            SwitchType\n----            ----------\nmy-switch       Bridged\ngood-switch     Internal\n"
+		list, err := switchListingOfExecuteResults([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error for unknown switch type: %v", err)
+		}
+		// "my-switch" with unknown type is skipped; "good-switch" is returned.
+		if len(list.Internal) != 1 || list.Internal[0] != "good-switch" {
+			t.Errorf("expected [good-switch] in Internal, got %v", list.Internal)
 		}
 	})
 }

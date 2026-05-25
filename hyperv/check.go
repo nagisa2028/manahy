@@ -1,9 +1,6 @@
 package hyperv
 
-import (
-	"strings"
-	"sync"
-)
+import "strings"
 
 // CheckStatus represents the result of a single check.
 type CheckStatus int
@@ -95,24 +92,37 @@ func checkHyperVPermission() CheckResult {
 }
 
 func checkCmdlets(cmdlets []string) []CheckResult {
-	results := make([]CheckResult, len(cmdlets))
-	var wg sync.WaitGroup
+	if len(cmdlets) == 0 {
+		return nil
+	}
+	quoted := make([]string, len(cmdlets))
 	for i, c := range cmdlets {
-		i, c := i, c
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			results[i] = checkCmdletExists(c)
-		}()
+		quoted[i] = ps(c)
 	}
-	wg.Wait()
-	return results
-}
-
-func checkCmdletExists(cmdlet string) CheckResult {
-	_, err := outputPS("Get-Command " + ps(cmdlet) + " -ErrorAction Stop | Out-Null")
+	cmd := "Get-Command " + strings.Join(quoted, ",") +
+		" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name"
+	out, err := outputPS(cmd)
 	if err != nil {
-		return CheckResult{Name: cmdlet, Status: CheckFail, Message: "not found"}
+		// PS itself failed (not found, timeout, etc.); report all cmdlets as unavailable.
+		results := make([]CheckResult, len(cmdlets))
+		for i, c := range cmdlets {
+			results[i] = CheckResult{Name: c, Status: CheckFail, Message: "PS unavailable"}
+		}
+		return results
 	}
-	return CheckResult{Name: cmdlet, Status: CheckOK, Message: "available"}
+	found := make(map[string]bool, len(cmdlets))
+	for _, line := range reSplit.Split(string(out), -1) {
+		if line := strings.TrimSpace(line); line != "" {
+			found[line] = true
+		}
+	}
+	results := make([]CheckResult, len(cmdlets))
+	for i, c := range cmdlets {
+		if found[c] {
+			results[i] = CheckResult{Name: c, Status: CheckOK, Message: "available"}
+		} else {
+			results[i] = CheckResult{Name: c, Status: CheckFail, Message: "not found"}
+		}
+	}
+	return results
 }

@@ -37,11 +37,14 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 	var vmList VMList
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || reBlank.MatchString(line) {
+		if reBlank.MatchString(line) {
 			continue
 		}
 		state := reVMState.FindString(line)
 		line = strings.TrimSpace(reVMState.ReplaceAllString(line, ""))
+		if line == "" {
+			continue
+		}
 
 		switch state {
 		case vmStateRunning:
@@ -53,7 +56,9 @@ func vmListingOfExecuteResults(res []byte) (VMList, error) {
 		case vmStatePaused:
 			vmList.Paused = append(vmList.Paused, line)
 		default:
-			return vmList, fmt.Errorf("unknown VM state in output: %q", state)
+			// Skip VMs in transient states (Starting, Stopping, Saving, etc.)
+			// rather than returning an error for the entire call.
+			continue
 		}
 	}
 	return vmList, nil
@@ -63,11 +68,14 @@ func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 	var switchList SwitchList
 	for _, line := range reSplit.Split(string(res), -1) {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Name") || reBlank.MatchString(line) {
+		if reBlank.MatchString(line) {
 			continue
 		}
 		switchType := reSwitchType.FindString(line)
 		line = strings.TrimSpace(reSwitchType.ReplaceAllString(line, ""))
+		if line == "" {
+			continue
+		}
 
 		switch switchType {
 		case "External":
@@ -77,7 +85,8 @@ func switchListingOfExecuteResults(res []byte) (SwitchList, error) {
 		case "Private":
 			switchList.Private = append(switchList.Private, line)
 		default:
-			return switchList, fmt.Errorf("unknown switch type in output: %q", switchType)
+			// Skip switches with unrecognised types rather than failing the whole call.
+			continue
 		}
 	}
 	return switchList, nil

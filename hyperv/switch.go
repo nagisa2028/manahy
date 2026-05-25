@@ -41,6 +41,31 @@ func GetSwitchType(name string) string {
 	return vmStateUnknown
 }
 
+// getSwitchTypeMap returns name→type for all virtual switches in one PS call.
+// Switches whose type cannot be parsed are omitted; callers treat missing entries as missing.
+func getSwitchTypeMap() (map[string]string, error) {
+	res, err := outputPS(cmdGetVMSwitch + " | Format-Table Name, SwitchType")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query switch types: %w", err)
+	}
+	m := make(map[string]string)
+	for _, line := range reSplit.Split(string(res), -1) {
+		line = strings.TrimSpace(line)
+		if line == "" || reBlank.MatchString(line) {
+			continue
+		}
+		switchType := reSwitchType.FindString(line)
+		if switchType == "" {
+			continue
+		}
+		name := strings.TrimSpace(reSwitchType.ReplaceAllString(line, ""))
+		if name != "" {
+			m[name] = switchType
+		}
+	}
+	return m, nil
+}
+
 // IsSwitchExist returns an error if the switch does not exist.
 func IsSwitchExist(name string) error {
 	switch GetSwitchType(name) {

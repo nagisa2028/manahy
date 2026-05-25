@@ -3,6 +3,7 @@ package hyperv
 import (
 	"bytes"
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -262,14 +263,21 @@ func TestResolveAndCreateDisks(t *testing.T) {
 		},
 	}
 
-	t.Run("count=1 returns base path without creating a new disk", func(t *testing.T) {
+	t.Run("count=1 disk already exists returns base path without creating", func(t *testing.T) {
+		// When the disk file is already present, resolveAndCreateDisks must not
+		// call CreateDisk (runPS) even though it now performs an idempotent check.
 		runCalled := false
 		withPS(t,
 			func(_ string) error {
 				runCalled = true
 				return nil
 			},
-			buildOutputMock,
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("True\n"), nil // disk already exists
+				}
+				return buildOutputMock(cmd)
+			},
 		)
 		paths, err := resolveAndCreateDisks(config, []string{"boot"}, 1, 1)
 		if err != nil {
@@ -279,7 +287,35 @@ func TestResolveAndCreateDisks(t *testing.T) {
 			t.Errorf("resolveAndCreateDisks count=1: got %v, want [C:\\VMs\\boot.vhd]", paths)
 		}
 		if runCalled {
-			t.Error("resolveAndCreateDisks count=1: runPS should not be called")
+			t.Error("resolveAndCreateDisks count=1: runPS should not be called when disk already exists")
+		}
+	})
+
+	t.Run("count=1 disk not found creates it idempotently", func(t *testing.T) {
+		// A disk alias that was skipped in the top-level pass (because another VM
+		// with count>1 also references it) must be created here for the count=1 VM.
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(cmd string) ([]byte, error) {
+				if strings.Contains(cmd, "Test-Path") {
+					return []byte("False\n"), nil // disk not yet on disk
+				}
+				return buildOutputMock(cmd)
+			},
+		)
+		paths, err := resolveAndCreateDisks(config, []string{"boot"}, 1, 1)
+		if err != nil {
+			t.Fatalf("resolveAndCreateDisks count=1 create: expected nil, got %v", err)
+		}
+		if len(paths) != 1 || paths[0] != `C:\VMs\boot.vhd` {
+			t.Errorf("resolveAndCreateDisks count=1 create: got %v, want [C:\\VMs\\boot.vhd]", paths)
+		}
+		if !runCalled {
+			t.Error("resolveAndCreateDisks count=1 create: runPS should be called to create missing disk")
 		}
 	})
 
@@ -565,12 +601,39 @@ func TestRemoveByStruct(t *testing.T) {
 
 // --- StartByStruct / StopByStruct ---
 
+// batchVMStateOutput returns a simulated Format-Table Name,State output for
+// the given name→state mapping. The format intentionally mirrors what
+// PowerShell's "Get-VM | Format-Table Name, State" produces:
+//
+//	Name    State
+//	----    -----
+//	vm1     Running
+//
+// The helper uses two spaces between name and state (real PS output pads to
+// column width, but the parser only requires at least one whitespace separator).
+// Keys are sorted so the output is deterministic across test runs.
+func batchVMStateOutput(nameStates map[string]string) []byte {
+	names := make([]string, 0, len(nameStates))
+	for name := range nameStates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var sb strings.Builder
+	sb.WriteString("Name    State\n----    -----\n")
+	for _, name := range names {
+		sb.WriteString(name + "  " + nameStates[name] + "\n")
+	}
+	return []byte(sb.String())
+}
+
 func TestStartByStruct(t *testing.T) {
 	t.Run("off VM is started", func(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -585,7 +648,9 @@ func TestStartByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -596,18 +661,55 @@ func TestStartByStruct(t *testing.T) {
 		}
 	})
 
-	t.Run("not found VM is skipped", func(t *testing.T) {
+	t.Run("VM absent from host is skipped silently", func(t *testing.T) {
+		// A VM in the config that does not appear in the batch PS output (absent
+		// map key) is treated as NotFound and silently skipped.
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return nil, errors.New("not found") },
+			func(_ string) ([]byte, error) {
+				// Empty batch: host has no VMs.
+				return batchVMStateOutput(map[string]string{}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"ghost": {Count: 1}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
 			t.Fatalf("StartByStruct: expected nil for not-found VM, got %v", err)
 		}
 		if runCalled {
-			t.Error("StartByStruct: runPS called for not-found VM")
+			t.Error("StartByStruct: runPS called for absent VM")
+		}
+	})
+
+	t.Run("getVMStateMap PS failure propagates as error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error { return nil },
+			func(_ string) ([]byte, error) { return nil, errors.New("hyper-v unavailable") },
+		)
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &bytes.Buffer{}); err == nil {
+			t.Fatal("StartByStruct: expected error on PS failure, got nil")
+		}
+	})
+
+	t.Run("transient state VM is skipped with warning", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error { runCalled = true; return nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Starting"}), nil
+			},
+		)
+		var buf bytes.Buffer
+		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
+		if err := StartByStruct(config, &buf); err != nil {
+			t.Fatalf("StartByStruct: expected nil for transient-state VM, got %v", err)
+		}
+		if runCalled {
+			t.Error("StartByStruct: runPS called for transient-state VM")
+		}
+		if !strings.Contains(buf.String(), "transient") {
+			t.Errorf("StartByStruct: expected transient-state warning in output, got %q", buf.String())
 		}
 	})
 
@@ -623,7 +725,11 @@ func TestStartByStruct(t *testing.T) {
 				mu.Unlock()
 				return nil
 			},
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{
+					"router1": "Off", "router2": "Off", "router3": "Off",
+				}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 3}}}
 		if err := StartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -652,7 +758,9 @@ func TestStopByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
@@ -667,7 +775,9 @@ func TestStopByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := StopByStruct(config, &bytes.Buffer{}); err != nil {
@@ -684,7 +794,9 @@ func TestRestartByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -699,7 +811,9 @@ func TestRestartByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := RestartByStruct(config, &bytes.Buffer{}); err != nil {
@@ -716,7 +830,9 @@ func TestSaveByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
@@ -731,7 +847,9 @@ func TestSaveByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Off"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := SaveByStruct(config, &bytes.Buffer{}); err != nil {
@@ -748,7 +866,9 @@ func TestResumeByStruct(t *testing.T) {
 		var capturedCmd string
 		withPS(t,
 			func(c string) error { capturedCmd = c; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Saved"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
@@ -763,7 +883,9 @@ func TestResumeByStruct(t *testing.T) {
 		runCalled := false
 		withPS(t,
 			func(_ string) error { runCalled = true; return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{"router": "Running"}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 1}}}
 		if err := ResumeByStruct(config, &bytes.Buffer{}); err != nil {
@@ -778,17 +900,33 @@ func TestResumeByStruct(t *testing.T) {
 // TestByStructConcurrent verifies that the parallel ByStruct functions are race-free.
 // Run with -race to detect data races.
 func TestByStructConcurrent(t *testing.T) {
+	// multiConfig has alpha(1) + beta(3) = 4 instances: alpha, beta1, beta2, beta3.
 	multiConfig := Summarize{
 		Vms: map[string]VM{
 			"alpha": {Count: 1},
 			"beta":  {Count: 3},
 		},
 	}
+	multiOff := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Off", "beta1": "Off", "beta2": "Off", "beta3": "Off",
+		})
+	}
+	multiRunning := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Running", "beta1": "Running", "beta2": "Running", "beta3": "Running",
+		})
+	}
+	multiSaved := func() []byte {
+		return batchVMStateOutput(map[string]string{
+			"alpha": "Saved", "beta1": "Saved", "beta2": "Saved", "beta3": "Saved",
+		})
+	}
 
 	t.Run("StartByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) { return multiOff(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := StartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -800,7 +938,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("StopByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := StopByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -812,7 +950,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("RestartByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := RestartByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -824,7 +962,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("SaveByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Running"), nil },
+			func(_ string) ([]byte, error) { return multiRunning(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := SaveByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -836,7 +974,7 @@ func TestByStructConcurrent(t *testing.T) {
 	t.Run("ResumeByStruct no data race", func(t *testing.T) {
 		withPS(t,
 			func(_ string) error { return nil },
-			func(_ string) ([]byte, error) { return stateOutput("Saved"), nil },
+			func(_ string) ([]byte, error) { return multiSaved(), nil },
 		)
 		for i := 0; i < 20; i++ {
 			if err := ResumeByStruct(multiConfig, &bytes.Buffer{}); err != nil {
@@ -857,7 +995,11 @@ func TestByStructConcurrent(t *testing.T) {
 				mu.Unlock()
 				return errors.New("simulated error")
 			},
-			func(_ string) ([]byte, error) { return stateOutput("Off"), nil },
+			func(_ string) ([]byte, error) {
+				return batchVMStateOutput(map[string]string{
+					"router1": "Off", "router2": "Off", "router3": "Off", "router4": "Off",
+				}), nil
+			},
 		)
 		config := Summarize{Vms: map[string]VM{"router": {Count: 4}}}
 		err := StartByStruct(config, &bytes.Buffer{})

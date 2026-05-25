@@ -41,6 +41,46 @@ func GetVMState(name string) string {
 	return vmStateUnknown
 }
 
+// getVMStateMap returns name→state for all VMs on the host in one PS call.
+// VMs in transient states (e.g. Starting, Stopping) are included with their raw state string.
+// Missing entries should be treated as NotFound by callers.
+// Returns an error if the PowerShell query fails.
+func getVMStateMap() (map[string]string, error) {
+	res, err := outputPS(cmdGetVM + " | Format-Table Name, State")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query VM states: %w", err)
+	}
+	m := make(map[string]string)
+	for _, line := range reSplit.Split(string(res), -1) {
+		line = strings.TrimSpace(line)
+		if line == "" || reBlank.MatchString(line) {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		state := fields[len(fields)-1]
+		if state == "State" {
+			// Format-Table header row "Name  State" — skip.
+			continue
+		}
+		// Reconstruct the VM name as everything before the last whitespace token.
+		// strings.LastIndex is safe here because Format-Table always right-pads the
+		// Name column with spaces before the State column, ensuring the state word
+		// appears at the rightmost position in the line. Even when the VM name
+		// contains the same word as the state (e.g. "vm-Off-test" with state "Off"),
+		// LastIndex returns the index of the actual state column — not the substring
+		// inside the name — because the state column occurrence is always last.
+		idx := strings.LastIndex(line, state)
+		name := strings.TrimSpace(line[:idx])
+		if name != "" {
+			m[name] = state
+		}
+	}
+	return m, nil
+}
+
 // IsVMExist returns an error if the VM does not exist.
 func IsVMExist(name string) error {
 	switch GetVMState(name) {
@@ -93,24 +133,32 @@ func SetVMMemory(name string, memory Memory) error {
 }
 
 // SetVMHardDisk attaches hard disk drives to a VM.
+// All Add-VMHardDiskDrive calls are batched into a single PowerShell script
+// separated by semicolons. $ErrorActionPreference = 'Stop' is prepended so
+// that the first failure aborts the script immediately rather than continuing
+// to attach subsequent disks. VM names and paths are escaped via ps() which
+// wraps values in single quotes and doubles any embedded single quote.
 func SetVMHardDisk(name string, disks []string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
-
+	if len(disks) == 0 {
+		return nil
+	}
 	for _, disk := range disks {
 		if err := isFileExist(disk); err != nil {
 			return err
 		}
-
-		cmd := cmdAddVMHardDiskDrive + " -VMName " + ps(name)
-		cmd += " -Path " + ps(disk)
-
-		if err := runPS(cmd); err != nil {
-			return err
-		}
 	}
-	return nil
+	var sb strings.Builder
+	sb.WriteString("$ErrorActionPreference = 'Stop'; ")
+	for i, disk := range disks {
+		if i > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(cmdAddVMHardDiskDrive + " -VMName " + ps(name) + " -Path " + ps(disk))
+	}
+	return runPS(sb.String())
 }
 
 // SetVMImageFile attaches a DVD/ISO image to a VM.
@@ -129,23 +177,35 @@ func SetVMImageFile(name string, image string) error {
 }
 
 // SetVMSwitch connects network adapters of a VM to virtual switches.
+// All Add-VMNetworkAdapter calls are batched into a single PowerShell script.
+// $ErrorActionPreference = 'Stop' causes the script to abort on the first
+// failure, so network adapters beyond the failing one are not attached.
+// Names are escaped via ps() (single-quoted with embedded quotes doubled).
 func SetVMSwitch(name string, networks []string) error {
+	if len(networks) == 0 {
+		return nil
+	}
+	// Validate all switches in one batch PS call rather than one call per switch.
+	// A missing map entry means the switch does not exist or the batch PS call
+	// failed; either way the operation cannot proceed.
+	typeMap, err := getSwitchTypeMap()
+	if err != nil {
+		return err
+	}
 	for _, network := range networks {
-		switch GetSwitchType(network) {
-		case vmStateNotFound:
+		if typeMap[network] == "" {
 			return fmt.Errorf("switch %s does not exist", network)
-		case vmStateUnknown:
-			return fmt.Errorf("failed to get state of switch %s", network)
-		}
-
-		cmd := cmdAddVMNetworkAdapter + " -VMName " + ps(name)
-		cmd += " -SwitchName " + ps(network)
-
-		if err := runPS(cmd); err != nil {
-			return err
 		}
 	}
-	return nil
+	var sb strings.Builder
+	sb.WriteString("$ErrorActionPreference = 'Stop'; ")
+	for i, network := range networks {
+		if i > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(cmdAddVMNetworkAdapter + " -VMName " + ps(name) + " -SwitchName " + ps(network))
+	}
+	return runPS(sb.String())
 }
 
 // CreateVM creates a new VM with the specified configuration.
@@ -232,8 +292,8 @@ func RenameVM(name string, newName string) error {
 
 // ConnectVM opens a VM console connection.
 func ConnectVM(name string) error {
-	if GetVMState(name) != vmStateRunning {
-		return fmt.Errorf("VM %s is not running", name)
+	if err := IsVMExist(name); err != nil {
+		return err
 	}
 	return runPS(cmdVMConnect + " localhost " + ps(name))
 }
@@ -384,11 +444,16 @@ func checkMemorySize(size string) error {
 	}
 	n, _ := strconv.Atoi(size[:len(size)-2])
 	unit := size[len(size)-2:]
-	sizeGB := n
-	if unit == "TB" {
-		sizeGB = n * 1024
+	var sizeMB int
+	switch unit {
+	case "TB":
+		sizeMB = n * 1024 * 1024
+	case "GB":
+		sizeMB = n * 1024
+	default: // MB
+		sizeMB = n
 	}
-	if sizeGB > maxMemorySizeGB {
+	if sizeMB > maxMemorySizeGB*1024 {
 		return fmt.Errorf("memory size %s exceeds maximum allowed size of %dTB", size, maxMemorySizeGB/1024)
 	}
 	return nil

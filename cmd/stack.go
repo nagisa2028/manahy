@@ -80,7 +80,11 @@ func newStackRemoveCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Remove all resources defined in "+path+"?", force) {
 				return nil
 			}
-			return hyperv.RemoveByStruct(data, os.Stderr)
+			if err := hyperv.RemoveByStruct(data, os.Stderr); err != nil {
+				// Per-resource failures already written to stderr by RemoveByStruct.
+				return fmt.Errorf("one or more resources could not be removed")
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be removed without making changes")
@@ -134,7 +138,11 @@ func newStackStartCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return hyperv.StartByStruct(data, os.Stderr)
+			if err := hyperv.StartByStruct(data, os.Stderr); err != nil {
+				// Per-VM failures already written to stderr by StartByStruct.
+				return fmt.Errorf("one or more VMs failed to start")
+			}
+			return nil
 		},
 	}
 }
@@ -152,7 +160,11 @@ func newStackStopCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Stop all VMs defined in "+path+"?", force) {
 				return nil
 			}
-			return hyperv.StopByStruct(data, os.Stderr)
+			if err := hyperv.StopByStruct(data, os.Stderr); err != nil {
+				// Per-VM failures already written to stderr by StopByStruct.
+				return fmt.Errorf("one or more VMs failed to stop")
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
@@ -172,7 +184,11 @@ func newStackRestartCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Restart all running VMs defined in "+path+"?", force) {
 				return nil
 			}
-			return hyperv.RestartByStruct(data, os.Stderr)
+			if err := hyperv.RestartByStruct(data, os.Stderr); err != nil {
+				// Per-VM failures already written to stderr by RestartByStruct.
+				return fmt.Errorf("one or more VMs failed to restart")
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
@@ -192,7 +208,11 @@ func newStackSaveCmd(configFile *string) *cobra.Command {
 			if !confirmAction("Save state of all running VMs defined in "+path+"?", force) {
 				return nil
 			}
-			return hyperv.SaveByStruct(data, os.Stderr)
+			if err := hyperv.SaveByStruct(data, os.Stderr); err != nil {
+				// Per-VM failures already written to stderr by SaveByStruct.
+				return fmt.Errorf("one or more VMs failed to save")
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
@@ -208,7 +228,11 @@ func newStackResumeCmd(configFile *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return hyperv.ResumeByStruct(data, os.Stderr)
+			if err := hyperv.ResumeByStruct(data, os.Stderr); err != nil {
+				// Per-VM failures already written to stderr by ResumeByStruct.
+				return fmt.Errorf("one or more VMs failed to resume")
+			}
+			return nil
 		},
 	}
 }

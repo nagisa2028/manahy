@@ -34,10 +34,14 @@ func BuildByStruct(summarize Summarize) error {
 
 	for key, network := range summarize.Networks {
 		network.Name = key
-		if GetSwitchType(network.Name) == vmStateNotFound {
+		switch GetSwitchType(network.Name) {
+		case vmStateNotFound:
 			if err := CreateSwitch(network, true); err != nil {
 				return err
 			}
+		case vmStateUnknown:
+			return fmt.Errorf("failed to query state of switch %s", network.Name)
+		// default: switch exists, skip
 		}
 	}
 
@@ -102,14 +106,26 @@ func runVMsParallel(summarize Summarize, fn func(name string)) {
 }
 
 // StartByStruct starts all VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are already running or not found are silently skipped.
+// VMs in a transient state (e.g. Starting) emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StartByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		state := GetVMState(name)
-		if state == vmStateRunning || state == vmStateNotFound {
+		state := stateMap[name]
+		// state == "" means the VM was not found in the batch PS output (absent map
+		// key). This is equivalent to vmStateNotFound and should be silently skipped,
+		// just as a VM that does not exist on the host would be.
+		if state == vmStateRunning || state == "" {
+			return
+		}
+		if skipIfTransient(state, name, w, &mu) {
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
@@ -122,14 +138,38 @@ func StartByStruct(summarize Summarize, w io.Writer) error {
 	return lastErr
 }
 
+// skipIfTransient writes a warning to w and returns true when the VM is present
+// in the state map but in a transient state that prevents the requested
+// operation (e.g. "Starting" when trying to stop). It returns false for stable
+// states (Running/Saved/Off/Paused) and for VMs absent from the map.
+func skipIfTransient(state, name string, w io.Writer, mu *sync.Mutex) bool {
+	if state == "" || reVMState.MatchString(state) {
+		return false
+	}
+	mu.Lock()
+	_, _ = fmt.Fprintf(w, "skipping %s: VM is in transient state %q\n", name, state)
+	mu.Unlock()
+	return true
+}
+
 // StopByStruct gracefully stops all VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func StopByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdStopVM + " -Name " + ps(name)); err != nil {
@@ -143,13 +183,23 @@ func StopByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // RestartByStruct restarts all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func RestartByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdRestartVM + " -Name " + ps(name) + " -Force"); err != nil {
@@ -163,13 +213,23 @@ func RestartByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // SaveByStruct saves the state of all running VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not running or not found are silently skipped.
+// VMs in a transient state emit a warning to w and are skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func SaveByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateRunning {
+		state := stateMap[name]
+		if skipIfTransient(state, name, w, &mu) {
+			return
+		}
+		if state != vmStateRunning {
 			return
 		}
 		if err := runPS(cmdSaveVM + " -Name " + ps(name)); err != nil {
@@ -183,13 +243,18 @@ func SaveByStruct(summarize Summarize, w io.Writer) error {
 }
 
 // ResumeByStruct resumes all saved VMs defined in the config concurrently.
+// VM states are fetched in a single batch PS call before spawning goroutines.
 // VMs that are not in saved state or not found are silently skipped.
 // Partial failures are written to w; the last error encountered is returned.
 func ResumeByStruct(summarize Summarize, w io.Writer) error {
+	stateMap, err := getVMStateMap()
+	if err != nil {
+		return err
+	}
 	var mu sync.Mutex
 	var lastErr error
 	runVMsParallel(summarize, func(name string) {
-		if GetVMState(name) != vmStateSaved {
+		if stateMap[name] != vmStateSaved {
 			return
 		}
 		if err := runPS(cmdStartVM + " " + ps(name)); err != nil {
@@ -272,6 +337,20 @@ func resolveAndCreateDisks(summarize Summarize, refs []string, index, count int)
 			continue
 		}
 		if disk.Import || count == 1 {
+			if !disk.Import {
+				// Create the disk idempotently — it may have been skipped in the
+				// BuildByStruct top-level pass if another VM with count>1 references
+				// this alias.
+				exists, err := searchFilePath(disk.Path)
+				if err != nil {
+					return nil, err
+				}
+				if !exists {
+					if err := CreateDisk(disk, true); err != nil {
+						return nil, err
+					}
+				}
+			}
 			paths[i] = disk.Path
 			continue
 		}

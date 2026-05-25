@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/DevelopNaoki/manahy/hyperv"
 	"github.com/spf13/cobra"
@@ -174,7 +175,7 @@ func newVMRemoveCmd() *cobra.Command {
 			if !confirmAction(prompt, force) {
 				return nil
 			}
-			return runParallel(args, func(name string) error {
+			return runParallel(os.Stderr, args, func(name string) error {
 				return hyperv.RemoveVM(name, false)
 			})
 		},
@@ -204,7 +205,7 @@ func newVMStartCmd() *cobra.Command {
 		Short: "start VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.StartVM)
+			return runParallel(os.Stderr, args, hyperv.StartVM)
 		},
 	}
 }
@@ -215,7 +216,7 @@ func newVMSaveCmd() *cobra.Command {
 		Short: "save VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.SaveVM)
+			return runParallel(os.Stderr, args, hyperv.SaveVM)
 		},
 	}
 }
@@ -226,7 +227,7 @@ func newVMShutdownCmd() *cobra.Command {
 		Short: "shutdown VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.StopVM)
+			return runParallel(os.Stderr, args, hyperv.StopVM)
 		},
 	}
 }
@@ -237,7 +238,7 @@ func newVMDestroyCmd() *cobra.Command {
 		Short: "destroy VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.DestroyVM)
+			return runParallel(os.Stderr, args, hyperv.DestroyVM)
 		},
 	}
 }
@@ -248,7 +249,7 @@ func newVMSuspendCmd() *cobra.Command {
 		Short: "suspend VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.SuspendVM)
+			return runParallel(os.Stderr, args, hyperv.SuspendVM)
 		},
 	}
 }
@@ -259,7 +260,7 @@ func newVMResumeCmd() *cobra.Command {
 		Short: "resume paused VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.ResumeVM)
+			return runParallel(os.Stderr, args, hyperv.ResumeVM)
 		},
 	}
 }
@@ -270,7 +271,7 @@ func newVMRestartCmd() *cobra.Command {
 		Short: "restart VM",
 		Args:  cobra.RangeArgs(1, maxBulkArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runParallel(args, hyperv.RestartVM)
+			return runParallel(os.Stderr, args, hyperv.RestartVM)
 		},
 	}
 }

@@ -26,6 +26,7 @@ func newRootCmd() *cobra.Command {
 			return fmt.Errorf("need a valid subcommand")
 		},
 	}
+	cmd.SilenceErrors = true
 	cmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file path")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "print each PowerShell command before execution")
 	cmd.AddCommand(

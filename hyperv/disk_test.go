@@ -537,3 +537,172 @@ func TestCreateDisk(t *testing.T) {
 	})
 }
 
+
+// ---------- TestRemoveDisk ----------
+
+func TestRemoveDisk(t *testing.T) {
+	t.Run("file exists calls runPS and returns nil", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return []byte("True\n"), nil
+			},
+		)
+		if err := RemoveDisk(`C:\disk.vhd`, false); err != nil {
+			t.Fatalf("RemoveDisk: expected nil, got %v", err)
+		}
+		if !runCalled {
+			t.Error("RemoveDisk: runPS was not called")
+		}
+	})
+
+	t.Run("file not found returns error before runPS", func(t *testing.T) {
+		runCalled := false
+		withPS(t,
+			func(_ string) error {
+				runCalled = true
+				return nil
+			},
+			func(_ string) ([]byte, error) {
+				return []byte("False\n"), nil
+			},
+		)
+		err := RemoveDisk(`C:\missing.vhd`, false)
+		if err == nil {
+			t.Fatal("RemoveDisk: expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("RemoveDisk: error %q does not contain 'does not exist'", err.Error())
+		}
+		if runCalled {
+			t.Error("RemoveDisk: runPS should not be called when file is missing")
+		}
+	})
+
+	t.Run("runPS failure returns error", func(t *testing.T) {
+		withPS(t,
+			func(_ string) error {
+				return errors.New("access denied")
+			},
+			func(_ string) ([]byte, error) {
+				return []byte("True\n"), nil
+			},
+		)
+		err := RemoveDisk(`C:\disk.vhd`, false)
+		if err == nil {
+			t.Fatal("RemoveDisk: expected error from runPS, got nil")
+		}
+	})
+}
+
+// ---------- runPS failure paths for VHD operations ----------
+
+func TestResizeVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("resize failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := ResizeVHD(`C:\disk.vhd`, "50GB")
+	if err == nil {
+		t.Fatal("ResizeVHD: expected error from runPS, got nil")
+	}
+}
+
+func TestOptimizeVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("optimize failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := OptimizeVHD(`C:\disk.vhd`)
+	if err == nil {
+		t.Fatal("OptimizeVHD: expected error from runPS, got nil")
+	}
+}
+
+func TestMountVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("mount failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := MountVHD(`C:\disk.vhd`)
+	if err == nil {
+		t.Fatal("MountVHD: expected error from runPS, got nil")
+	}
+}
+
+func TestDismountVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("dismount failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := DismountVHD(`C:\disk.vhd`)
+	if err == nil {
+		t.Fatal("DismountVHD: expected error from runPS, got nil")
+	}
+}
+
+func TestMergeVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("merge failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := MergeVHD(`C:\child.vhd`, "")
+	if err == nil {
+		t.Fatal("MergeVHD: expected error from runPS, got nil")
+	}
+}
+
+func TestConvertVHDRunPSFailure(t *testing.T) {
+	withPS(t,
+		func(_ string) error {
+			return errors.New("convert failed")
+		},
+		func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		},
+	)
+	err := ConvertVHD(`C:\disk.vhd`, `C:\disk2.vhdx`, "")
+	if err == nil {
+		t.Fatal("ConvertVHD: expected error from runPS, got nil")
+	}
+}
+
+// ---------- checkDiskSize GB boundary ----------
+
+func TestCheckDiskSizeGBBoundary(t *testing.T) {
+	// maxDiskSizeGB = 64 * 1024 = 65536 GB
+	t.Run("65536GB at limit is valid", func(t *testing.T) {
+		if err := checkDiskSize("65536GB"); err != nil {
+			t.Errorf("checkDiskSize(65536GB): expected nil, got %v", err)
+		}
+	})
+	t.Run("65537GB exceeds limit is invalid", func(t *testing.T) {
+		if err := checkDiskSize("65537GB"); err == nil {
+			t.Error("checkDiskSize(65537GB): expected error, got nil")
+		}
+	})
+}
