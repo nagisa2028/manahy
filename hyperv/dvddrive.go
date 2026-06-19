@@ -41,6 +41,7 @@ func SetVMDvdDrive(vmName, imagePath string) error {
 		pathParam = ps(imagePath)
 	}
 	script := "$dvd = " + cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Select-Object -First 1; " +
+		"if ($dvd -eq $null) { throw 'no DVD drive attached to VM " + vmName + "' }; " +
 		cmdSetVMDvdDrive + " -VMName " + ps(vmName) + " -ControllerNumber $dvd.ControllerNumber " +
 		"-ControllerLocation $dvd.ControllerLocation -Path " + pathParam
 	return runPS(script)

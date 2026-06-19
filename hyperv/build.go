@@ -371,8 +371,14 @@ func resolveAndCreateDisks(summarize Summarize, refs []string, index, count int)
 		// count>1 and non-import: create a numbered disk copy for this VM instance.
 		numbered := disk
 		numbered.Path = numberPath(disk.Path, index)
-		if err := CreateDisk(numbered, true); err != nil {
+		exists, err := searchFilePath(numbered.Path)
+		if err != nil {
 			return nil, err
+		}
+		if !exists {
+			if err := CreateDisk(numbered, true); err != nil {
+				return nil, err
+			}
 		}
 		paths[i] = numbered.Path
 	}

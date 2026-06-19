@@ -147,7 +147,7 @@ Operates on all resources defined in a config file at once.
 > manahy vm nic add     <vm> [--name <name>] [--switch <switch>]
 > manahy vm nic remove  <vm> --name <name>
 > manahy vm nic connect <vm> --name <name> --switch <switch>
-> manahy vm nic vlan    <vm> --name <name> --id <vlan-id>
+> manahy vm nic vlan    <vm> --name <name> --vlan <vlan-id>
 ```
 
 ### disk — virtual disk (VHD) management

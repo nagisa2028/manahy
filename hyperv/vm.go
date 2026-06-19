@@ -131,9 +131,15 @@ func SetVMMemory(name string, memory Memory) error {
 
 	if memory.Dynamic {
 		if memory.Min != "" {
+			if err := checkMemorySize(memory.Min); err != nil {
+				return fmt.Errorf("invalid memory min: %w", err)
+			}
 			cmd += " -MinimumBytes " + memory.Min
 		}
 		if memory.Max != "" {
+			if err := checkMemorySize(memory.Max); err != nil {
+				return fmt.Errorf("invalid memory max: %w", err)
+			}
 			cmd += " -MaximumBytes " + memory.Max
 		}
 		if memory.Buffer > 0 {

@@ -30,7 +30,9 @@ func CreateDisk(newDisk Disk, output bool) error {
 		cmd += " -SizeBytes " + newDisk.Size
 	case diskTypeFixed:
 		cmd += " -SizeBytes " + newDisk.Size
-		cmd += " -SourceDisk " + strconv.Itoa(newDisk.SourceDisk)
+		if newDisk.SourceDisk > 0 {
+			cmd += " -SourceDisk " + strconv.Itoa(newDisk.SourceDisk)
+		}
 		cmd += " -Fixed"
 	case diskTypeDifferencing:
 		cmd += " -ParentPath " + ps(newDisk.ParentPath)

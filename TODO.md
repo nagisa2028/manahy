@@ -28,9 +28,9 @@ Items deferred for future consideration.
 
 ## Storage
 
-- **`disk optimize` / `disk compact`**: surface `Optimize-VHD` as a standalone subcommand.
-- **`disk convert`**: wrap `Convert-VHD` for format changes (VHDX ↔ VHD, dynamic ↔ fixed).
-- **`disk merge`**: wrap `Merge-VHD` for collapsing differencing disk chains.
+- ~~**`disk optimize` / `disk compact`**: surface `Optimize-VHD` as a standalone subcommand.~~ ✓ Implemented
+- ~~**`disk convert`**: wrap `Convert-VHD` for format changes (VHDX ↔ VHD, dynamic ↔ fixed).~~ ✓ Implemented
+- ~~**`disk merge`**: wrap `Merge-VHD` for collapsing differencing disk chains.~~ ✓ Implemented
 
 ## Host / infrastructure
 

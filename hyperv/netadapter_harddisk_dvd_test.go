@@ -554,8 +554,8 @@ func TestSetVMDvdDrive(t *testing.T) {
 		if !strings.Contains(capturedCmd, "C:\\image.iso") {
 			t.Errorf("SetVMDvdDrive: command %q does not contain 'C:\\image.iso'", capturedCmd)
 		}
-		if strings.Contains(capturedCmd, "$null") {
-			t.Errorf("SetVMDvdDrive: command %q should not contain '$null' when imagePath is set", capturedCmd)
+		if strings.Contains(capturedCmd, "-Path $null") {
+			t.Errorf("SetVMDvdDrive: command %q should not use '-Path $null' when imagePath is set", capturedCmd)
 		}
 	})
 
