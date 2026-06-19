@@ -1,0 +1,41 @@
+package cmd
+
+import (
+	"fmt"
+
+	"github.com/DevelopNaoki/manahy/hyperv"
+	"github.com/spf13/cobra"
+)
+
+func newHostCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "host",
+		Short: "show Hyper-V host information",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("need a valid subcommand")
+		},
+	}
+	cmd.AddCommand(
+		newHostShowCmd(),
+		newHostCheckCmd(),
+		newMemberCmd(),
+		newStorageCmd(),
+	)
+	return cmd
+}
+
+func newHostShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "show Hyper-V host configuration",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			out, err := hyperv.GetVMHost()
+			if err != nil {
+				return err
+			}
+			fmt.Print(out)
+			return nil
+		},
+	}
+}

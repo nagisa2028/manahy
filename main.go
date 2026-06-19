@@ -1,3 +1,4 @@
+// Package main is the entry point for the manahy CLI.
 package main
 
 import (
@@ -8,8 +9,8 @@ import (
 )
 
 func main() {
-	if err := cmd.RootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "")
-		os.Exit(-1)
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }

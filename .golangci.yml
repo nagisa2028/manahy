@@ -1,0 +1,22 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - misspell
+    - revive
+    - gocritic
+    - gochecknoglobals
+    - nilerr
+    - godot
+    - copyloopvar
+    - intrange
+    - errorlint
+    - goconst
+
+linters-settings:
+  revive:
+    rules:
+      - name: error-strings
+      - name: var-naming
+      - name: exported

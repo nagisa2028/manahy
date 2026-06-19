@@ -1,18 +1,19 @@
+// Package internal provides shared utility functions for manahy.
 package internal
 
 import (
 	"fmt"
 )
 
-// Add trailing whitespace for size to text
+// SizeAdjustment pads text with trailing spaces until it reaches the given size.
 func SizeAdjustment(text string, size int) string {
 	for len(text) < size {
-		text = text + " "
+		text += " "
 	}
 	return text
 }
 
-// Display headers based on washed arguments
+// PrintHeader prints a formatted table header with separator line.
 func PrintHeader(header []string, headerSize []int) {
 	if len(header) != len(headerSize) {
 		return
@@ -25,7 +26,7 @@ func PrintHeader(header []string, headerSize []int) {
 	fmt.Printf("\n")
 
 	for i := range header {
-		for j := 0; j < len(header[i]); j++ {
+		for range header[i] {
 			fmt.Printf("-")
 		}
 		fmt.Printf("\t")
