@@ -124,6 +124,9 @@ func SetVMMemory(name string, memory Memory) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
+	if err := checkMemorySize(memory.Size); err != nil {
+		return fmt.Errorf("invalid memory size: %w", err)
+	}
 
 	cmd := cmdSetVMMemory + " -VMName " + ps(name)
 	cmd += " -StartupBytes " + memory.Size
@@ -142,7 +145,10 @@ func SetVMMemory(name string, memory Memory) error {
 			}
 			cmd += " -MaximumBytes " + memory.Max
 		}
-		if memory.Buffer > 0 {
+		if memory.Buffer != 0 {
+			if memory.Buffer < 5 || memory.Buffer > 100 {
+				return fmt.Errorf("memory buffer must be between 5 and 100, got %d", memory.Buffer)
+			}
 			cmd += " -Buffer " + strconv.Itoa(memory.Buffer)
 		}
 	}

@@ -186,6 +186,12 @@ func MergeVHD(path, destPath string) error {
 // CloneDisk creates a new VHD by copying an existing one using New-VHD -SourcePath.
 // The source must exist; the destination must not.
 func CloneDisk(srcPath, destPath string) error {
+	if !isWindowsAbsPath(srcPath) {
+		return fmt.Errorf("source path must be absolute: %s", srcPath)
+	}
+	if !isWindowsAbsPath(destPath) {
+		return fmt.Errorf("destination path must be absolute: %s", destPath)
+	}
 	if err := isFileExist(srcPath); err != nil {
 		return fmt.Errorf("source disk: %w", err)
 	}

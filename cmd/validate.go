@@ -60,8 +60,8 @@ func validateConfig(data hyperv.Summarize) []string {
 		// Verify disk aliases exist in the config.
 		for _, diskRef := range vm.Disks {
 			if _, ok := data.Disks[diskRef]; !ok {
-				// Could be a raw path — only warn if it doesn't look like a path.
-				if len(diskRef) > 0 && diskRef[0] != 'C' && diskRef[0] != '\\' && diskRef[0] != '/' {
+				// Could be a raw absolute path — only warn if it doesn't look like one.
+				if !hyperv.IsWindowsAbsPath(diskRef) {
 					errs = append(errs, fmt.Sprintf("vm %q: disk ref %q not found in disks section", name, diskRef))
 				}
 			}
