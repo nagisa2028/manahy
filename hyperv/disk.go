@@ -178,6 +178,9 @@ func MergeVHD(path, destPath string) error {
 	}
 	cmd := cmdMergeVHD + " -Path " + ps(path)
 	if destPath != "" {
+		if !isWindowsAbsPath(destPath) {
+			return fmt.Errorf("destination path must be absolute: %s", destPath)
+		}
 		cmd += " -DestinationPath " + ps(destPath)
 	}
 	return runPSLong(cmd)

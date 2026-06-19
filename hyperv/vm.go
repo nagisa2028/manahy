@@ -456,6 +456,9 @@ func MoveVMStorage(name, destPath string) error {
 	if err := IsVMExist(name); err != nil {
 		return err
 	}
+	if !isWindowsAbsPath(destPath) {
+		return fmt.Errorf("destination path must be absolute: %s", destPath)
+	}
 	return runPSLong(cmdMoveVMStorage + " -VMName " + ps(name) + " -DestinationStoragePath " + ps(destPath))
 }
 

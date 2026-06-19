@@ -54,8 +54,8 @@ func validateConfig(data hyperv.Summarize) []string {
 		if vm.Path == "" {
 			errs = append(errs, fmt.Sprintf("vm %q: path is required", name))
 		}
-		if vm.Memory.Buffer < 0 || vm.Memory.Buffer > 100 {
-			errs = append(errs, fmt.Sprintf("vm %q: memory.buffer must be between 0 and 100, got %d", name, vm.Memory.Buffer))
+		if vm.Memory.Buffer != 0 && (vm.Memory.Buffer < 5 || vm.Memory.Buffer > 100) {
+			errs = append(errs, fmt.Sprintf("vm %q: memory.buffer must be between 5 and 100 (or 0 to use default), got %d", name, vm.Memory.Buffer))
 		}
 		// Verify disk aliases exist in the config.
 		for _, diskRef := range vm.Disks {
