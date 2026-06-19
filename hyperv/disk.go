@@ -83,6 +83,12 @@ func checkDiskParam(newDisk Disk) error {
 	return checkDiskSize(newDisk.Size)
 }
 
+// CheckDiskSize validates that size matches ^([0-9]+)[TGM]B$ and is within limits.
+func CheckDiskSize(size string) error { return checkDiskSize(size) }
+
+// CheckDiskType validates that diskType is one of dynamic, fixed, or differencing.
+func CheckDiskType(diskType string) error { return checkDiskType(diskType) }
+
 func checkDiskType(diskType string) error {
 	switch diskType {
 	case diskTypeDynamic, diskTypeFixed, diskTypeDifferencing:
@@ -147,6 +153,12 @@ func OptimizeVHD(path string) error {
 func ConvertVHD(path, destPath, diskType string) error {
 	if err := isFileExist(path); err != nil {
 		return err
+	}
+	if !isWindowsAbsPath(destPath) {
+		return fmt.Errorf("destination path must be absolute: %s", destPath)
+	}
+	if err := isNotFileExist(destPath); err != nil {
+		return fmt.Errorf("destination disk: %w", err)
 	}
 	cmd := cmdConvertVHD + " -Path " + ps(path) + " -DestinationPath " + ps(destPath)
 	if diskType != "" {

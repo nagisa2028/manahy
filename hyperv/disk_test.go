@@ -312,6 +312,18 @@ func TestMergeVHD(t *testing.T) {
 }
 
 func TestConvertVHD(t *testing.T) {
+	// outputPS hook that returns True for the source (call 1) and False for the dest (call 2).
+	srcExistDestNew := func() func(string) ([]byte, error) {
+		call := 0
+		return func(_ string) ([]byte, error) {
+			call++
+			if call == 1 {
+				return []byte("True\n"), nil // source exists
+			}
+			return []byte("False\n"), nil // destination does not exist yet
+		}
+	}
+
 	t.Run("file exists calls runPS", func(t *testing.T) {
 		runCalled := false
 		withPS(t,
@@ -319,9 +331,7 @@ func TestConvertVHD(t *testing.T) {
 				runCalled = true
 				return nil
 			},
-			func(_ string) ([]byte, error) {
-				return []byte("True\n"), nil
-			},
+			srcExistDestNew(),
 		)
 		if err := ConvertVHD("C:\\disk.vhd", "C:\\disk2.vhdx", ""); err != nil {
 			t.Errorf("ConvertVHD: expected nil, got %v", err)
@@ -338,9 +348,7 @@ func TestConvertVHD(t *testing.T) {
 				capturedCmd = c
 				return nil
 			},
-			func(_ string) ([]byte, error) {
-				return []byte("True\n"), nil
-			},
+			srcExistDestNew(),
 		)
 		if err := ConvertVHD("C:\\disk.vhd", "C:\\disk2.vhdx", "Fixed"); err != nil {
 			t.Errorf("ConvertVHD: expected nil, got %v", err)
@@ -360,6 +368,32 @@ func TestConvertVHD(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "does not exist") {
 			t.Errorf("ConvertVHD: error %q does not contain 'does not exist'", err.Error())
+		}
+	})
+
+	t.Run("relative destPath returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil
+		})
+		err := ConvertVHD("C:\\disk.vhd", "relative\\dest.vhdx", "")
+		if err == nil {
+			t.Fatal("ConvertVHD: expected error for relative destPath, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") {
+			t.Errorf("ConvertVHD: error %q does not contain 'absolute'", err.Error())
+		}
+	})
+
+	t.Run("existing destPath returns error", func(t *testing.T) {
+		withPS(t, nil, func(_ string) ([]byte, error) {
+			return []byte("True\n"), nil // both src and dest "exist"
+		})
+		err := ConvertVHD("C:\\disk.vhd", "C:\\existing.vhdx", "")
+		if err == nil {
+			t.Fatal("ConvertVHD: expected error when dest exists, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("ConvertVHD: error %q does not contain 'already exists'", err.Error())
 		}
 	})
 }

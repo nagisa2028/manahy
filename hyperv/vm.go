@@ -525,6 +525,9 @@ func checkVMProcessor(cpu CPU) error {
 	return nil
 }
 
+// CheckMemorySize validates that size matches ^[0-9]+[TGM]B$ and is within limits.
+func CheckMemorySize(size string) error { return checkMemorySize(size) }
+
 func checkMemorySize(size string) error {
 	if reMemorySize.FindString(size) == "" {
 		return fmt.Errorf("invalid memory size format: %s (expected e.g. 512MB, 1GB)", size)

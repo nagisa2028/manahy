@@ -50,11 +50,13 @@ func validateConfig(data hyperv.Summarize) []string {
 		}
 		if vm.Memory.Size == "" {
 			errs = append(errs, fmt.Sprintf("vm %q: memory.size is required", name))
+		} else if err := hyperv.CheckMemorySize(vm.Memory.Size); err != nil {
+			errs = append(errs, fmt.Sprintf("vm %q: memory.size: %s", name, err))
 		}
 		if vm.Path == "" {
 			errs = append(errs, fmt.Sprintf("vm %q: path is required", name))
 		}
-		if vm.Memory.Buffer != 0 && (vm.Memory.Buffer < 5 || vm.Memory.Buffer > 100) {
+		if vm.Memory.Dynamic && vm.Memory.Buffer != 0 && (vm.Memory.Buffer < 5 || vm.Memory.Buffer > 100) {
 			errs = append(errs, fmt.Sprintf("vm %q: memory.buffer must be between 5 and 100 (or 0 to use default), got %d", name, vm.Memory.Buffer))
 		}
 		// Verify disk aliases exist in the config.
@@ -90,6 +92,14 @@ func validateConfig(data hyperv.Summarize) []string {
 		if !disk.Import {
 			if disk.Type == "" {
 				errs = append(errs, fmt.Sprintf("disk %q: type is required when import is false", name))
+			} else if err := hyperv.CheckDiskType(disk.Type); err != nil {
+				errs = append(errs, fmt.Sprintf("disk %q: %s", name, err))
+			} else if disk.Type != "differencing" {
+				if disk.Size == "" {
+					errs = append(errs, fmt.Sprintf("disk %q: size is required for type %s", name, disk.Type))
+				} else if err := hyperv.CheckDiskSize(disk.Size); err != nil {
+					errs = append(errs, fmt.Sprintf("disk %q: size: %s", name, err))
+				}
 			}
 		}
 	}

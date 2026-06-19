@@ -40,8 +40,14 @@ func SetVMDvdDrive(vmName, imagePath string) error {
 	if imagePath != "" {
 		pathParam = ps(imagePath)
 	}
+	// Eject (empty imagePath) is idempotent: silently skip if no DVD drive is present.
+	// Attach (non-empty imagePath) requires a DVD drive to exist.
+	nullAction := "if ($dvd -eq $null) { return }"
+	if imagePath != "" {
+		nullAction = "if ($dvd -eq $null) { throw 'no DVD drive found' }"
+	}
 	script := "$dvd = " + cmdGetVMDvdDrive + " -VMName " + ps(vmName) + " | Select-Object -First 1; " +
-		"if ($dvd -eq $null) { throw 'no DVD drive found' }; " +
+		nullAction + "; " +
 		cmdSetVMDvdDrive + " -VMName " + ps(vmName) + " -ControllerNumber $dvd.ControllerNumber " +
 		"-ControllerLocation $dvd.ControllerLocation -Path " + pathParam
 	return runPS(script)
